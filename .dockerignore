@@ -1,0 +1,17 @@
+node_modules/
+vendor/
+.env
+.git/
+.gitignore
+.idea/
+.vscode/
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*
+*.log
+.DS_Store
+README.md
+.editorconfig
+.phpunit.result.cache
