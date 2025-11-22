@@ -36,13 +36,20 @@ class SiteSettings extends Page
             'state' => $site?->state,
             'zip' => $site?->zip,
             'bio' => $site?->bio,
+            'license_number' => $site?->license_number,
+            'brokerage' => $site?->brokerage,
+            'years_experience' => $site?->years_experience,
+            'specialties' => $site?->specialties,
             'template_id' => $site?->template_id,
             'primary_color' => $site?->primary_color ?? '#3B82F6',
             'logo_path' => $site?->logo_path,
+            'headshot' => $site?->headshot,
+            'hero_image' => $site?->hero_image,
             'facebook' => $site?->facebook,
             'instagram' => $site?->instagram,
             'linkedin' => $site?->linkedin,
             'twitter' => $site?->twitter,
+            'youtube' => $site?->youtube,
             'meta_title' => $site?->meta_title,
             'meta_description' => $site?->meta_description,
             'is_published' => $site?->is_published ?? false,
@@ -56,92 +63,179 @@ class SiteSettings extends Page
                 Forms\Components\Tabs::make('Settings')
                     ->tabs([
                         Forms\Components\Tabs\Tab::make('Business Info')
+                            ->icon('heroicon-o-building-office')
                             ->schema([
                                 Forms\Components\TextInput::make('site_name')
                                     ->label('Business Name')
                                     ->required()
-                                    ->maxLength(255),
+                                    ->maxLength(255)
+                                    ->placeholder('John Smith Realty'),
                                 Forms\Components\TextInput::make('tagline')
                                     ->maxLength(500)
-                                    ->placeholder('Your trusted real estate partner'),
+                                    ->placeholder('Your Dream Home Awaits'),
                                 Forms\Components\TextInput::make('email')
                                     ->email()
-                                    ->required(),
+                                    ->required()
+                                    ->placeholder('john@example.com'),
                                 Forms\Components\TextInput::make('phone')
                                     ->tel()
-                                    ->maxLength(50),
+                                    ->maxLength(50)
+                                    ->placeholder('(555) 123-4567'),
                                 Forms\Components\TextInput::make('address')
-                                    ->maxLength(255),
+                                    ->maxLength(255)
+                                    ->placeholder('123 Main Street'),
                                 Forms\Components\Grid::make(3)
                                     ->schema([
                                         Forms\Components\TextInput::make('city')
-                                            ->maxLength(100),
+                                            ->maxLength(100)
+                                            ->placeholder('Los Angeles'),
                                         Forms\Components\TextInput::make('state')
-                                            ->maxLength(100),
+                                            ->maxLength(100)
+                                            ->placeholder('CA'),
                                         Forms\Components\TextInput::make('zip')
                                             ->label('ZIP Code')
-                                            ->maxLength(20),
+                                            ->maxLength(20)
+                                            ->placeholder('90210'),
                                     ]),
-                                Forms\Components\Textarea::make('bio')
-                                    ->label('About Me / Bio')
-                                    ->rows(5)
-                                    ->columnSpanFull(),
                             ])->columns(2),
 
-                        Forms\Components\Tabs\Tab::make('Appearance')
+                        Forms\Components\Tabs\Tab::make('Professional Info')
+                            ->icon('heroicon-o-academic-cap')
                             ->schema([
-                                Forms\Components\Select::make('template_id')
-                                    ->label('Website Template')
-                                    ->options(Template::where('is_active', true)->pluck('name', 'id'))
-                                    ->required()
-                                    ->native(false),
-                                Forms\Components\ColorPicker::make('primary_color')
-                                    ->label('Primary Color'),
+                                Forms\Components\RichEditor::make('bio')
+                                    ->label('About Me / Bio')
+                                    ->toolbarButtons([
+                                        'bold',
+                                        'italic',
+                                        'bulletList',
+                                        'orderedList',
+                                    ])
+                                    ->columnSpanFull()
+                                    ->helperText('Tell your story. What makes you the best choice for your clients?'),
+                                Forms\Components\TextInput::make('license_number')
+                                    ->label('License Number')
+                                    ->maxLength(100)
+                                    ->placeholder('DRE #01234567'),
+                                Forms\Components\TextInput::make('brokerage')
+                                    ->label('Brokerage')
+                                    ->maxLength(255)
+                                    ->placeholder('Keller Williams Realty'),
+                                Forms\Components\TextInput::make('years_experience')
+                                    ->label('Years of Experience')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(99)
+                                    ->placeholder('15'),
+                                Forms\Components\TextInput::make('specialties')
+                                    ->label('Specialties')
+                                    ->maxLength(500)
+                                    ->placeholder('Luxury Homes, First-Time Buyers, Investment Properties')
+                                    ->helperText('Comma-separated list of your specializations'),
+                            ])->columns(2),
+
+                        Forms\Components\Tabs\Tab::make('Images')
+                            ->icon('heroicon-o-photo')
+                            ->schema([
+                                Forms\Components\FileUpload::make('headshot')
+                                    ->label('Professional Headshot')
+                                    ->image()
+                                    ->directory('headshots')
+                                    ->visibility('public')
+                                    ->imageResizeMode('cover')
+                                    ->imageCropAspectRatio('1:1')
+                                    ->imageResizeTargetWidth('600')
+                                    ->imageResizeTargetHeight('600')
+                                    ->helperText('A professional photo of yourself. Square aspect ratio recommended.'),
+                                Forms\Components\FileUpload::make('hero_image')
+                                    ->label('Hero Background Image')
+                                    ->image()
+                                    ->directory('hero-images')
+                                    ->visibility('public')
+                                    ->imageResizeMode('cover')
+                                    ->imageResizeTargetWidth('1920')
+                                    ->imageResizeTargetHeight('1080')
+                                    ->helperText('Large banner image for your homepage. Landscape orientation recommended.'),
                                 Forms\Components\FileUpload::make('logo_path')
                                     ->label('Logo')
                                     ->image()
                                     ->directory('logos')
                                     ->visibility('public')
-                                    ->columnSpanFull(),
+                                    ->helperText('Your business logo. PNG with transparent background recommended.'),
+                            ])->columns(1),
+
+                        Forms\Components\Tabs\Tab::make('Appearance')
+                            ->icon('heroicon-o-paint-brush')
+                            ->schema([
+                                Forms\Components\Select::make('template_id')
+                                    ->label('Website Template')
+                                    ->options(Template::where('is_active', true)->pluck('name', 'id'))
+                                    ->required()
+                                    ->native(false)
+                                    ->helperText('Choose a design that matches your brand'),
+                                Forms\Components\ColorPicker::make('primary_color')
+                                    ->label('Primary Brand Color')
+                                    ->helperText('This color will be used throughout your website'),
                             ])->columns(2),
 
                         Forms\Components\Tabs\Tab::make('Social Links')
+                            ->icon('heroicon-o-share')
                             ->schema([
                                 Forms\Components\TextInput::make('facebook')
                                     ->label('Facebook URL')
                                     ->url()
-                                    ->maxLength(500),
+                                    ->maxLength(500)
+                                    ->prefix('https://')
+                                    ->placeholder('facebook.com/yourpage'),
                                 Forms\Components\TextInput::make('instagram')
                                     ->label('Instagram URL')
                                     ->url()
-                                    ->maxLength(500),
+                                    ->maxLength(500)
+                                    ->prefix('https://')
+                                    ->placeholder('instagram.com/yourhandle'),
                                 Forms\Components\TextInput::make('linkedin')
                                     ->label('LinkedIn URL')
                                     ->url()
-                                    ->maxLength(500),
+                                    ->maxLength(500)
+                                    ->prefix('https://')
+                                    ->placeholder('linkedin.com/in/yourprofile'),
                                 Forms\Components\TextInput::make('twitter')
                                     ->label('Twitter/X URL')
                                     ->url()
-                                    ->maxLength(500),
+                                    ->maxLength(500)
+                                    ->prefix('https://')
+                                    ->placeholder('twitter.com/yourhandle'),
+                                Forms\Components\TextInput::make('youtube')
+                                    ->label('YouTube URL')
+                                    ->url()
+                                    ->maxLength(500)
+                                    ->prefix('https://')
+                                    ->placeholder('youtube.com/@yourchannel'),
                             ])->columns(2),
 
                         Forms\Components\Tabs\Tab::make('SEO')
+                            ->icon('heroicon-o-magnifying-glass')
                             ->schema([
                                 Forms\Components\TextInput::make('meta_title')
                                     ->label('Meta Title')
-                                    ->maxLength(255)
-                                    ->helperText('Recommended: 50-60 characters'),
+                                    ->maxLength(60)
+                                    ->helperText('Recommended: 50-60 characters. This appears in search results.')
+                                    ->placeholder('John Smith | Top Los Angeles Real Estate Agent'),
                                 Forms\Components\Textarea::make('meta_description')
                                     ->label('Meta Description')
                                     ->rows(3)
-                                    ->helperText('Recommended: 150-160 characters'),
+                                    ->maxLength(160)
+                                    ->helperText('Recommended: 150-160 characters. Describe your services.')
+                                    ->placeholder('Award-winning Los Angeles real estate agent with 15+ years of experience...'),
                             ]),
 
                         Forms\Components\Tabs\Tab::make('Publishing')
+                            ->icon('heroicon-o-globe-alt')
                             ->schema([
                                 Forms\Components\Toggle::make('is_published')
                                     ->label('Publish Website')
-                                    ->helperText('Make your website visible to the public'),
+                                    ->helperText('Make your website visible to the public')
+                                    ->onColor('success')
+                                    ->offColor('danger'),
                             ]),
                     ])->columnSpanFull(),
             ])
@@ -173,13 +267,20 @@ class SiteSettings extends Page
             'state' => $data['state'],
             'zip' => $data['zip'],
             'bio' => $data['bio'],
+            'license_number' => $data['license_number'],
+            'brokerage' => $data['brokerage'],
+            'years_experience' => $data['years_experience'],
+            'specialties' => $data['specialties'],
             'template_id' => $data['template_id'],
             'primary_color' => $data['primary_color'],
             'logo_path' => $data['logo_path'],
+            'headshot' => $data['headshot'],
+            'hero_image' => $data['hero_image'],
             'facebook' => $data['facebook'],
             'instagram' => $data['instagram'],
             'linkedin' => $data['linkedin'],
             'twitter' => $data['twitter'],
+            'youtube' => $data['youtube'],
             'meta_title' => $data['meta_title'],
             'meta_description' => $data['meta_description'],
             'is_published' => $data['is_published'],
