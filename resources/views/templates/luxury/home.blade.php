@@ -11,7 +11,7 @@
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
         <div class="max-w-3xl">
             <h1 class="text-4xl md:text-5xl font-bold mb-4">
-                {{ $site?->business_name ?? $tenant->name }}
+                {{ $site?->site_name ?? $tenant->name }}
             </h1>
             <p class="text-xl text-gray-300 mb-8">
                 {{ $site?->tagline ?? 'Your trusted partner in finding the perfect home' }}
@@ -61,7 +61,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
                 @if($site?->headshot)
-                    <img src="{{ Storage::url($site->headshot) }}" alt="{{ $site?->business_name ?? $tenant->name }}" class="rounded-2xl shadow-xl w-full max-w-md mx-auto">
+                    <img src="{{ Storage::url($site->headshot) }}" alt="{{ $site?->site_name ?? $tenant->name }}" class="rounded-2xl shadow-xl w-full max-w-md mx-auto">
                 @else
                     <div class="bg-primary/10 rounded-2xl p-12 text-center">
                         <svg class="w-32 h-32 mx-auto text-primary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,7 +71,7 @@
                 @endif
             </div>
             <div>
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">About {{ $site?->business_name ?? $tenant->name }}</h2>
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">About {{ $site?->site_name ?? $tenant->name }}</h2>
                 @if($site?->bio)
                     <div class="prose prose-lg text-gray-600">
                         {!! $site->bio !!}

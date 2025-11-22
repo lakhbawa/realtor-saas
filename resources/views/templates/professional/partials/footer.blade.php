@@ -2,7 +2,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
-                <h3 class="text-xl font-serif font-bold mb-4">{{ $site?->business_name ?? $tenant->name }}</h3>
+                <h3 class="text-xl font-serif font-bold mb-4">{{ $site?->site_name ?? $tenant->name }}</h3>
                 <p class="text-white/70 mb-4">{{ $site?->tagline ?? 'Your trusted real estate partner' }}</p>
                 @if($site?->license_number)<p class="text-white/50 text-sm">{{ $site->license_number }}</p>@endif
             </div>
@@ -25,7 +25,7 @@
             </div>
         </div>
         <div class="border-t border-white/20 mt-8 pt-8 text-center text-white/50 text-sm">
-            <p>&copy; {{ date('Y') }} {{ $site?->business_name ?? $tenant->name }}. All rights reserved.</p>
+            <p>&copy; {{ date('Y') }} {{ $site?->site_name ?? $tenant->name }}. All rights reserved.</p>
         </div>
     </div>
 </footer>

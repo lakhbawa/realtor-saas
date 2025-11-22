@@ -23,7 +23,13 @@ class PublicSiteController extends Controller
 
     protected function getTenant(): User
     {
-        return app('tenant');
+        $tenant = app()->bound('tenant') ? app('tenant') : null;
+
+        if (!$tenant) {
+            abort(404, 'Site not found. Please access via subdomain.');
+        }
+
+        return $tenant;
     }
 
     protected function getTemplateName(): string

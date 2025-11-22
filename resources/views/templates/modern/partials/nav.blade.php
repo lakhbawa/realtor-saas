@@ -3,10 +3,10 @@
         <div class="flex justify-between h-16">
             <div class="flex items-center">
                 <a href="{{ route('tenant.home') }}" class="flex items-center">
-                    @if($site?->logo)
-                        <img src="{{ Storage::url($site->logo) }}" alt="{{ $site->business_name }}" class="h-10">
+                    @if($site?->logo_path)
+                        <img src="{{ Storage::url($site->logo_path) }}" alt="{{ $site->site_name }}" class="h-10">
                     @else
-                        <span class="text-xl font-bold text-primary">{{ $site?->business_name ?? $tenant->name }}</span>
+                        <span class="text-xl font-bold text-primary">{{ $site?->site_name ?? $tenant->name }}</span>
                     @endif
                 </a>
             </div>

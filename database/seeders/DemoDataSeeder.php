@@ -46,24 +46,22 @@ class DemoDataSeeder extends Seeder
             ['user_id' => $tenant->id],
             [
                 'template_id' => $template?->id,
-                'business_name' => 'John Smith Realty',
+                'site_name' => 'John Smith Realty',
                 'tagline' => 'Your Dream Home Awaits',
                 'email' => 'john@johnsmithrealty.com',
                 'phone' => '(555) 123-4567',
-                'address' => '123 Main Street, Suite 100, Beverly Hills, CA 90210',
-                'license_number' => 'DRE# 01234567',
-                'bio' => '<p>With over 15 years of experience in the real estate industry, I specialize in helping families find their perfect homes in the Los Angeles area.</p><p>My commitment to personalized service and deep knowledge of the local market ensures that every client receives the attention they deserve.</p>',
+                'address' => '123 Main Street, Suite 100',
+                'city' => 'Beverly Hills',
+                'state' => 'CA',
+                'zip' => '90210',
+                'bio' => 'With over 15 years of experience in the real estate industry, I specialize in helping families find their perfect homes in the Los Angeles area. My commitment to personalized service and deep knowledge of the local market ensures that every client receives the attention they deserve.',
                 'primary_color' => '#4F46E5',
-                'secondary_color' => '#10B981',
-                'social_links' => [
-                    'facebook' => 'https://facebook.com/johnsmithrealty',
-                    'instagram' => 'https://instagram.com/johnsmithrealty',
-                    'linkedin' => 'https://linkedin.com/in/johnsmithrealty',
-                ],
-                'seo_settings' => [
-                    'meta_title' => 'John Smith Realty - Beverly Hills Real Estate Agent',
-                    'meta_description' => 'Find your dream home in Beverly Hills with John Smith Realty. Over 15 years of experience helping families find their perfect homes.',
-                ],
+                'facebook' => 'https://facebook.com/johnsmithrealty',
+                'instagram' => 'https://instagram.com/johnsmithrealty',
+                'linkedin' => 'https://linkedin.com/in/johnsmithrealty',
+                'meta_title' => 'John Smith Realty - Beverly Hills Real Estate Agent',
+                'meta_description' => 'Find your dream home in Beverly Hills with John Smith Realty. Over 15 years of experience helping families find their perfect homes.',
+                'is_published' => true,
             ]
         );
 

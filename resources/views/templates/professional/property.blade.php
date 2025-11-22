@@ -146,9 +146,9 @@
                 <!-- Agent Card -->
                 <div class="bg-gray-50 rounded-xl p-6 text-center">
                     @if($site?->headshot)
-                        <img src="{{ Storage::url($site->headshot) }}" alt="{{ $site?->business_name ?? $tenant->name }}" class="w-24 h-24 rounded-full mx-auto mb-4 object-cover">
+                        <img src="{{ Storage::url($site->headshot) }}" alt="{{ $site?->site_name ?? $tenant->name }}" class="w-24 h-24 rounded-full mx-auto mb-4 object-cover">
                     @endif
-                    <h3 class="font-bold text-gray-900">{{ $site?->business_name ?? $tenant->name }}</h3>
+                    <h3 class="font-bold text-gray-900">{{ $site?->site_name ?? $tenant->name }}</h3>
                     @if($site?->license_number)
                         <p class="text-sm text-gray-500">{{ $site->license_number }}</p>
                     @endif

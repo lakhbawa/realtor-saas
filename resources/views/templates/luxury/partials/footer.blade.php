@@ -2,7 +2,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
             <div>
-                <h3 class="text-2xl font-serif tracking-wider mb-4">{{ $site?->business_name ?? $tenant->name }}</h3>
+                <h3 class="text-2xl font-serif tracking-wider mb-4">{{ $site?->site_name ?? $tenant->name }}</h3>
                 <p class="text-white/60 font-light">{{ $site?->tagline ?? 'Exceptional properties for exceptional clients' }}</p>
             </div>
             <div>
@@ -24,7 +24,7 @@
             </div>
         </div>
         <div class="border-t border-white/10 mt-12 pt-8 text-center text-white/40 text-xs uppercase tracking-widest">
-            <p>&copy; {{ date('Y') }} {{ $site?->business_name ?? $tenant->name }}</p>
+            <p>&copy; {{ date('Y') }} {{ $site?->site_name ?? $tenant->name }}</p>
         </div>
     </div>
 </footer>

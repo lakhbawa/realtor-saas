@@ -15,7 +15,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             <div>
                 @if($site?->headshot)
-                    <img src="{{ Storage::url($site->headshot) }}" alt="{{ $site?->business_name ?? $tenant->name }}" class="rounded-2xl shadow-xl w-full">
+                    <img src="{{ Storage::url($site->headshot) }}" alt="{{ $site?->site_name ?? $tenant->name }}" class="rounded-2xl shadow-xl w-full">
                 @else
                     <div class="bg-primary/10 rounded-2xl p-12 text-center aspect-square flex items-center justify-center">
                         <svg class="w-48 h-48 text-primary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -25,7 +25,7 @@
                 @endif
             </div>
             <div>
-                <h2 class="text-3xl font-bold text-gray-900 mb-2">{{ $site?->business_name ?? $tenant->name }}</h2>
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">{{ $site?->site_name ?? $tenant->name }}</h2>
                 @if($site?->tagline)
                     <p class="text-xl text-primary mb-6">{{ $site->tagline }}</p>
                 @endif

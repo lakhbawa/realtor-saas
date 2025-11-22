@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $metaTitle ?? $site?->business_name ?? $tenant->name }} | Real Estate</title>
-    <meta name="description" content="{{ $metaDescription ?? $site?->seo_settings['meta_description'] ?? 'Professional real estate services' }}">
+    <title>{{ $metaTitle ?? $site?->site_name ?? $tenant->name }} | Real Estate</title>
+    <meta name="description" content="{{ $metaDescription ?? $site?->meta_description ?? 'Professional real estate services' }}">
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=playfair-display:400,500,600,700&display=swap" rel="stylesheet" />
