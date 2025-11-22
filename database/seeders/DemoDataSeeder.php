@@ -140,21 +140,18 @@ class DemoDataSeeder extends Seeder
         $testimonials = [
             [
                 'client_name' => 'Sarah & Michael Johnson',
-                'client_location' => 'Beverly Hills, CA',
                 'content' => 'John made the home buying process incredibly smooth. His knowledge of the Beverly Hills market is unmatched, and he found us our dream home in just two weeks!',
                 'rating' => 5,
                 'is_published' => true,
             ],
             [
                 'client_name' => 'David Chen',
-                'client_location' => 'Pasadena, CA',
                 'content' => 'As a first-time home buyer, I was nervous about the whole process. John guided me every step of the way and was always available to answer my questions. Highly recommend!',
                 'rating' => 5,
                 'is_published' => true,
             ],
             [
                 'client_name' => 'Jennifer Martinez',
-                'client_location' => 'Santa Monica, CA',
                 'content' => 'John helped us sell our home in record time and above asking price. His marketing strategy and negotiation skills are top-notch. We couldn\'t be happier with the results.',
                 'rating' => 5,
                 'is_published' => true,

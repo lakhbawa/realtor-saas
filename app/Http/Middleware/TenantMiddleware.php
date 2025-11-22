@@ -21,22 +21,33 @@ class TenantMiddleware
         // Extract subdomain from host
         $subdomain = $this->extractSubdomain($host, $baseDomain);
 
-        if (!$subdomain) {
-            // No subdomain - either main site or invalid
-            return $next($request);
-        }
+        // Find the tenant
+        $tenant = null;
 
-        // Skip reserved subdomains
-        $reserved = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'localhost', 'dashboard'];
-        if (in_array($subdomain, $reserved)) {
-            return $next($request);
-        }
+        if ($subdomain) {
+            // Skip reserved subdomains
+            $reserved = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'dashboard'];
+            if (in_array($subdomain, $reserved)) {
+                return $next($request);
+            }
 
-        // Find the tenant by subdomain
-        $tenant = User::where('subdomain', $subdomain)->first();
+            // Find the tenant by subdomain
+            $tenant = User::where('subdomain', $subdomain)->first();
+
+            if (!$tenant) {
+                abort(404, 'Site not found');
+            }
+        } else {
+            // For development/testing: use first non-admin tenant or query param
+            if ($this->isLocalDevelopment($host)) {
+                $tenant = User::where('is_admin', false)
+                    ->whereIn('subscription_status', ['active', 'trialing'])
+                    ->first();
+            }
+        }
 
         if (!$tenant) {
-            abort(404, 'Site not found');
+            return $next($request);
         }
 
         // Check if tenant has active subscription
@@ -59,9 +70,8 @@ class TenantMiddleware
      */
     protected function extractSubdomain(string $host, string $baseDomain): ?string
     {
-        // Handle localhost development
-        if (str_contains($host, 'localhost') || str_contains($host, '127.0.0.1')) {
-            // For local development, check for subdomain in query string
+        // Handle localhost development - check query param first
+        if ($this->isLocalDevelopment($host)) {
             return request()->query('subdomain');
         }
 
@@ -74,5 +84,15 @@ class TenantMiddleware
         }
 
         return strtolower($subdomain);
+    }
+
+    /**
+     * Check if running in local development.
+     */
+    protected function isLocalDevelopment(string $host): bool
+    {
+        return str_contains($host, 'localhost')
+            || str_contains($host, '127.0.0.1')
+            || app()->environment('local', 'testing');
     }
 }

@@ -101,9 +101,6 @@
                     </div>
                     <p class="text-gray-600 mb-4">"{{ $testimonial->content }}"</p>
                     <p class="font-semibold text-gray-900">{{ $testimonial->client_name }}</p>
-                    @if($testimonial->client_location)
-                        <p class="text-sm text-gray-500">{{ $testimonial->client_location }}</p>
-                    @endif
                 </div>
             @endforeach
         </div>
