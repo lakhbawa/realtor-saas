@@ -15,12 +15,13 @@ class DemoDataSeeder extends Seeder
     public function run(): void
     {
         // Create admin user
+        // Note: password is auto-hashed by User model's 'hashed' cast
         $admin = User::updateOrCreate(
             ['email' => 'admin@example.com'],
             [
                 'name' => 'Admin User',
                 'subdomain' => 'admin-user',
-                'password' => Hash::make('password'),
+                'password' => 'password',
                 'is_admin' => true,
                 'subscription_status' => 'active',
             ]
@@ -32,7 +33,7 @@ class DemoDataSeeder extends Seeder
             [
                 'name' => 'John Smith',
                 'subdomain' => 'johnsmith',
-                'password' => Hash::make('password'),
+                'password' => 'password',
                 'is_admin' => false,
                 'subscription_status' => 'active',
             ]

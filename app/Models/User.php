@@ -68,7 +68,7 @@ class User extends Authenticatable implements FilamentUser
         }
 
         // Tenant panel - check subscription status
-        return in_array($this->subscription_status, ['active', 'past_due']);
+        return in_array($this->subscription_status, ['active', 'trialing', 'past_due']);
     }
 
     /**
