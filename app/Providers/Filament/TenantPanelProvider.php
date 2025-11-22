@@ -53,7 +53,6 @@ class TenantPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ])
-            ->viteTheme('resources/css/filament/tenant/theme.css');
+            ]);
     }
 }
