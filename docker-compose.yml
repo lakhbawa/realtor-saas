@@ -1,116 +1,170 @@
-version: '3.8'
-
+version: "3"
 services:
+  #PHP Service
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: realtor_app
+    depends_on:
+      - db
+    image: lakhveerbawa/phpdock:arm841
+    command:
+      - php-fpm
+    expose:
+      - 9000
+      - 9003
     restart: unless-stopped
+    tty: true
+    environment:
+      SERVICE_NAME: app
+      SERVICE_TAGS: dev
     working_dir: /var/www
     volumes:
       - ./:/var/www
-      - ./storage:/var/www/storage
-      - ./bootstrap/cache:/var/www/bootstrap/cache
+      - ./docker/config/php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
-      - realtor_network
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-realtor_saas}
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CACHE_DRIVER=redis
-      - QUEUE_CONNECTION=redis
-      - SESSION_DRIVER=redis
+      - app-network
+    #Nginx Service
 
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    restart: unless-stopped
+    command: "listen --forward-to http://nginx:80/stripe/webhook --log-level debug"
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET}
+    networks:
+      - app-network
+    depends_on:
+      - nginx
+  job:
+    depends_on:
+      - db
+    image: lakhveerbawa/phpdock:arm841
+    entrypoint: /usr/bin/supervisord -n -c /etc/supervisord.conf
+    expose:
+      - 9000
+      - 13714
+    restart: unless-stopped
+    tty: true
+    environment:
+      SERVICE_NAME: job
+      SERVICE_TAGS: dev
+    working_dir: /var/www
+    volumes:
+      - ./docker/config/php/production.ini:/usr/local/etc/php/conf.d/local.ini
+      - ./.env:/var/www/.env
+      - ./:/var/www
+      - ./docker/config/supervisor/queue/conf.d.queue:/etc/supervisor/conf.d
+      - ./docker/worker/supervisord.conf:/etc/supervisord.conf:delegated
+    networks:
+      - app-network
+  #Nginx Service
   nginx:
     image: nginx:alpine
-    container_name: realtor_nginx
     restart: unless-stopped
+    tty: true
     ports:
-      - "80:80"
-      - "443:443"
+      - "4300:80"
+      - "4301:443"
     volumes:
       - ./:/var/www
-      - ./docker/nginx/conf.d/:/etc/nginx/conf.d/
-      - ./docker/nginx/ssl/:/etc/nginx/ssl/
-      - ./storage/logs/nginx:/var/log/nginx
+      - ./docker/config/nginx/conf.d.local/:/etc/nginx/conf.d/
     networks:
-      - realtor_network
-    depends_on:
-      - app
+      - app-network
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: realtor
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    ports:
+      - "4332:5432"
+    networks: [app-network]
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: realtor_postgres
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "4350:80"
+    depends_on:
+      - db
+    networks: [app-network]
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+  adminer:
+    image: adminer:latest
+    ports:
+      - "4380:8080"
+    depends_on:
+      - db
+    networks: [app-network]
+  redis:
+    image: arm64v8/redis
+    restart: unless-stopped
+    tty: true
+    expose:
+      - 6379
+    volumes:
+      - redisdata:/data
+    networks:
+      - app-network
+  # phpmyadmin
+  phpmyadmin:
+    depends_on:
+      - db
+    image: arm64v8/phpmyadmin
+    restart: always
+    ports:
+      - '4383:80'
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: Sartaj@jaan855
+      UPLOAD_LIMIT: 100M
+    networks:
+      - app-network
+  wp-db:
+    image: mysql:latest
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-realtor_saas}
-      POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_DATABASE: mockready_wordpress
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: "mock@wp58310$"
+      MYSQL_ROOT_PASSWORD: "mock@wp58310$"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - wp-dbdata:/var/lib/mysql
     networks:
-      - realtor_network
-
-  redis:
-    image: redis:7-alpine
-    container_name: realtor_redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - realtor_network
-
-  scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: realtor_scheduler
-    restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./:/var/www
-    networks:
-      - realtor_network
+      - app-network
+  wp-phpmyadmin:
     depends_on:
-      - postgres
-      - redis
-    command: php artisan schedule:work
-
-  queue:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: realtor_queue
-    restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./:/var/www
+      - wp-db
+    image: arm64v8/phpmyadmin
+    restart: always
+    ports:
+      - '4385:80'
+    environment:
+      PMA_HOST: wp-db
+      MYSQL_ROOT_PASSWORD: "mock@wp58310$"
+      UPLOAD_LIMIT: 100M
     networks:
-      - realtor_network
-    depends_on:
-      - postgres
-      - redis
-    command: php artisan queue:work --tries=3 --timeout=90
+      - app-network
 
+#Docker Networks
 networks:
-  realtor_network:
+  app-network:
     driver: bridge
-
+#Volumes
 volumes:
-  postgres_data:
+  dbdata:
     driver: local
-  redis_data:
+  redisdata:
     driver: local
+  wp-content:
+    driver: local
+  wp-dbdata:
+    driver: local
+  pgadmin_data:
+    driver: local
+#  default:
+#    external:
+#      name: nginx-proxy
