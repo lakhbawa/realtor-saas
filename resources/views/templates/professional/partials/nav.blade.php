@@ -13,7 +13,13 @@
             <div class="hidden md:flex items-center space-x-8">
                 <a href="{{ route('tenant.home') }}" class="hover:text-secondary transition {{ request()->routeIs('tenant.home') ? 'text-secondary' : '' }}">Home</a>
                 <a href="{{ route('tenant.properties') }}" class="hover:text-secondary transition {{ request()->routeIs('tenant.properties*') ? 'text-secondary' : '' }}">Properties</a>
+                <a href="{{ route('tenant.blog') }}" class="hover:text-secondary transition {{ request()->routeIs('tenant.blog*') ? 'text-secondary' : '' }}">Blog</a>
                 <a href="{{ route('tenant.about') }}" class="hover:text-secondary transition {{ request()->routeIs('tenant.about') ? 'text-secondary' : '' }}">About</a>
+                @if(isset($navPages) && $navPages->count())
+                    @foreach($navPages as $navPage)
+                        <a href="{{ route('tenant.page', $navPage->slug) }}" class="hover:text-secondary transition {{ request()->is('page/'.$navPage->slug) ? 'text-secondary' : '' }}">{{ $navPage->title }}</a>
+                    @endforeach
+                @endif
                 <a href="{{ route('tenant.contact') }}" class="px-5 py-2 border-2 border-secondary text-secondary hover:bg-secondary hover:text-primary rounded transition">Contact</a>
             </div>
             <div class="md:hidden flex items-center">
@@ -30,7 +36,13 @@
         <div class="px-4 py-3 space-y-3">
             <a href="{{ route('tenant.home') }}" class="block hover:text-secondary">Home</a>
             <a href="{{ route('tenant.properties') }}" class="block hover:text-secondary">Properties</a>
+            <a href="{{ route('tenant.blog') }}" class="block hover:text-secondary">Blog</a>
             <a href="{{ route('tenant.about') }}" class="block hover:text-secondary">About</a>
+            @if(isset($navPages) && $navPages->count())
+                @foreach($navPages as $navPage)
+                    <a href="{{ route('tenant.page', $navPage->slug) }}" class="block hover:text-secondary">{{ $navPage->title }}</a>
+                @endforeach
+            @endif
             <a href="{{ route('tenant.contact') }}" class="block hover:text-secondary">Contact</a>
         </div>
     </div>

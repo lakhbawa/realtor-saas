@@ -19,9 +19,19 @@
                 <a href="{{ route('tenant.properties') }}" class="text-gray-700 hover:text-primary transition {{ request()->routeIs('tenant.properties*') ? 'text-primary font-semibold' : '' }}">
                     Properties
                 </a>
+                <a href="{{ route('tenant.blog') }}" class="text-gray-700 hover:text-primary transition {{ request()->routeIs('tenant.blog*') ? 'text-primary font-semibold' : '' }}">
+                    Blog
+                </a>
                 <a href="{{ route('tenant.about') }}" class="text-gray-700 hover:text-primary transition {{ request()->routeIs('tenant.about') ? 'text-primary font-semibold' : '' }}">
                     About
                 </a>
+                @if(isset($navPages) && $navPages->count())
+                    @foreach($navPages as $navPage)
+                        <a href="{{ route('tenant.page', $navPage->slug) }}" class="text-gray-700 hover:text-primary transition {{ request()->is('page/'.$navPage->slug) ? 'text-primary font-semibold' : '' }}">
+                            {{ $navPage->title }}
+                        </a>
+                    @endforeach
+                @endif
                 <a href="{{ route('tenant.contact') }}" class="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition">
                     Contact
                 </a>
@@ -44,7 +54,13 @@
         <div class="px-4 py-3 space-y-3">
             <a href="{{ route('tenant.home') }}" class="block text-gray-700 hover:text-primary">Home</a>
             <a href="{{ route('tenant.properties') }}" class="block text-gray-700 hover:text-primary">Properties</a>
+            <a href="{{ route('tenant.blog') }}" class="block text-gray-700 hover:text-primary">Blog</a>
             <a href="{{ route('tenant.about') }}" class="block text-gray-700 hover:text-primary">About</a>
+            @if(isset($navPages) && $navPages->count())
+                @foreach($navPages as $navPage)
+                    <a href="{{ route('tenant.page', $navPage->slug) }}" class="block text-gray-700 hover:text-primary">{{ $navPage->title }}</a>
+                @endforeach
+            @endif
             <a href="{{ route('tenant.contact') }}" class="block text-gray-700 hover:text-primary">Contact</a>
         </div>
     </div>

@@ -123,6 +123,52 @@
 </section>
 @endif
 
+<!-- Recent Blog Posts -->
+@if(isset($recentPosts) && $recentPosts->count())
+<section class="py-16 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-gray-900">Latest from the Blog</h2>
+            <p class="text-gray-600 mt-2">Stay informed with our latest articles and updates</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            @foreach($recentPosts as $post)
+                <article class="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition">
+                    @if($post->featured_image)
+                        <a href="{{ route('tenant.blog.post', $post->slug) }}">
+                            <img src="{{ Storage::url($post->featured_image) }}" alt="{{ $post->title }}" class="w-full h-40 object-cover">
+                        </a>
+                    @endif
+                    <div class="p-6">
+                        <div class="text-sm text-gray-500 mb-2">
+                            {{ $post->published_at->format('F j, Y') }}
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                            <a href="{{ route('tenant.blog.post', $post->slug) }}" class="hover:text-primary transition">
+                                {{ $post->title }}
+                            </a>
+                        </h3>
+                        @if($post->excerpt)
+                            <p class="text-gray-600 text-sm line-clamp-2">{{ $post->excerpt }}</p>
+                        @endif
+                    </div>
+                </article>
+            @endforeach
+        </div>
+
+        <div class="text-center mt-10">
+            <a href="{{ route('tenant.blog') }}" class="inline-flex items-center px-6 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-primary hover:text-white transition">
+                View All Articles
+                <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+</section>
+@endif
+
 <!-- CTA Section -->
 <section class="py-16 bg-primary">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

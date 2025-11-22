@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Models\Property;
 use App\Models\Testimonial;
 use App\Models\ContactSubmission;
+use App\Models\Page;
+use App\Models\BlogPost;
 use App\Mail\ContactFormSubmitted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -45,10 +47,18 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
         $template = $this->getTemplateName();
 
+        // Get published pages for navigation
+        $navPages = Page::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('is_published', true)
+            ->orderBy('sort_order')
+            ->get();
+
         $baseData = [
             'tenant' => $tenant,
             'site' => $tenant->site,
             'template' => $template,
+            'navPages' => $navPages,
         ];
 
         return view("templates.{$template}.{$view}", array_merge($baseData, $data));
@@ -73,9 +83,19 @@ class PublicSiteController extends Controller
             ->take(3)
             ->get();
 
+        $recentPosts = BlogPost::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('is_published', true)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->latest('published_at')
+            ->take(3)
+            ->get();
+
         return $this->view('home', [
             'featuredProperties' => $featuredProperties,
             'testimonials' => $testimonials,
+            'recentPosts' => $recentPosts,
         ]);
     }
 
@@ -88,14 +108,6 @@ class PublicSiteController extends Controller
             ->where('status', 'active');
 
         // Filters
-        if ($request->filled('type')) {
-            $query->where('property_type', $request->type);
-        }
-
-        if ($request->filled('status')) {
-            $query->where('listing_status', $request->status);
-        }
-
         if ($request->filled('min_price')) {
             $query->where('price', '>=', $request->min_price);
         }
@@ -108,13 +120,21 @@ class PublicSiteController extends Controller
             $query->where('bedrooms', '>=', $request->bedrooms);
         }
 
+        if ($request->filled('bathrooms')) {
+            $query->where('bathrooms', '>=', $request->bathrooms);
+        }
+
+        if ($request->filled('city')) {
+            $query->where('city', 'ilike', '%' . $request->city . '%');
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('address', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $q->where('title', 'ilike', "%{$search}%")
+                    ->orWhere('address', 'ilike', "%{$search}%")
+                    ->orWhere('city', 'ilike', "%{$search}%")
+                    ->orWhere('description', 'ilike', "%{$search}%");
             });
         }
 
@@ -135,11 +155,18 @@ class PublicSiteController extends Controller
             ->where('status', 'active')
             ->firstOrFail();
 
+        // Get related properties by similar price range or location
         $relatedProperties = Property::withoutGlobalScopes()
             ->where('user_id', $tenant->id)
             ->where('id', '!=', $property->id)
             ->where('status', 'active')
-            ->where('property_type', $property->property_type)
+            ->where(function ($query) use ($property) {
+                $query->where('city', $property->city)
+                    ->orWhereBetween('price', [
+                        $property->price * 0.7,
+                        $property->price * 1.3
+                    ]);
+            })
             ->take(3)
             ->get();
 
@@ -196,5 +223,76 @@ class PublicSiteController extends Controller
         Mail::to($notifyEmail)->queue(new ContactFormSubmitted($submission));
 
         return back()->with('success', 'Thank you for your message! We will get back to you soon.');
+    }
+
+    // Blog methods
+    public function blog(Request $request)
+    {
+        $tenant = $this->getTenant();
+
+        $query = BlogPost::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('is_published', true)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now());
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'ilike', "%{$search}%")
+                    ->orWhere('excerpt', 'ilike', "%{$search}%")
+                    ->orWhere('content', 'ilike', "%{$search}%");
+            });
+        }
+
+        $posts = $query->latest('published_at')->paginate(9);
+
+        return $this->view('blog', [
+            'posts' => $posts,
+        ]);
+    }
+
+    public function blogPost(string $slug)
+    {
+        $tenant = $this->getTenant();
+
+        $post = BlogPost::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('slug', $slug)
+            ->where('is_published', true)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->firstOrFail();
+
+        $recentPosts = BlogPost::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('id', '!=', $post->id)
+            ->where('is_published', true)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->latest('published_at')
+            ->take(3)
+            ->get();
+
+        return $this->view('blog-post', [
+            'post' => $post,
+            'recentPosts' => $recentPosts,
+        ]);
+    }
+
+    // Custom pages
+    public function page(string $slug)
+    {
+        $tenant = $this->getTenant();
+
+        $page = Page::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('slug', $slug)
+            ->where('is_published', true)
+            ->firstOrFail();
+
+        return $this->view('page', [
+            'page' => $page,
+        ]);
     }
 }

@@ -13,7 +13,13 @@
             <div class="hidden md:flex items-center space-x-10">
                 <a href="{{ route('tenant.home') }}" class="text-sm uppercase tracking-widest text-gray-700 hover:text-secondary transition {{ request()->routeIs('tenant.home') ? 'text-secondary' : '' }}">Home</a>
                 <a href="{{ route('tenant.properties') }}" class="text-sm uppercase tracking-widest text-gray-700 hover:text-secondary transition {{ request()->routeIs('tenant.properties*') ? 'text-secondary' : '' }}">Collection</a>
+                <a href="{{ route('tenant.blog') }}" class="text-sm uppercase tracking-widest text-gray-700 hover:text-secondary transition {{ request()->routeIs('tenant.blog*') ? 'text-secondary' : '' }}">Journal</a>
                 <a href="{{ route('tenant.about') }}" class="text-sm uppercase tracking-widest text-gray-700 hover:text-secondary transition {{ request()->routeIs('tenant.about') ? 'text-secondary' : '' }}">About</a>
+                @if(isset($navPages) && $navPages->count())
+                    @foreach($navPages as $navPage)
+                        <a href="{{ route('tenant.page', $navPage->slug) }}" class="text-sm uppercase tracking-widest text-gray-700 hover:text-secondary transition {{ request()->is('page/'.$navPage->slug) ? 'text-secondary' : '' }}">{{ $navPage->title }}</a>
+                    @endforeach
+                @endif
                 <a href="{{ route('tenant.contact') }}" class="text-sm uppercase tracking-widest px-6 py-3 bg-primary text-white hover:bg-secondary transition">Inquire</a>
             </div>
             <div class="md:hidden flex items-center">
@@ -30,7 +36,13 @@
         <div class="px-4 py-4 space-y-4">
             <a href="{{ route('tenant.home') }}" class="block text-sm uppercase tracking-widest">Home</a>
             <a href="{{ route('tenant.properties') }}" class="block text-sm uppercase tracking-widest">Collection</a>
+            <a href="{{ route('tenant.blog') }}" class="block text-sm uppercase tracking-widest">Journal</a>
             <a href="{{ route('tenant.about') }}" class="block text-sm uppercase tracking-widest">About</a>
+            @if(isset($navPages) && $navPages->count())
+                @foreach($navPages as $navPage)
+                    <a href="{{ route('tenant.page', $navPage->slug) }}" class="block text-sm uppercase tracking-widest">{{ $navPage->title }}</a>
+                @endforeach
+            @endif
             <a href="{{ route('tenant.contact') }}" class="block text-sm uppercase tracking-widest">Inquire</a>
         </div>
     </div>
