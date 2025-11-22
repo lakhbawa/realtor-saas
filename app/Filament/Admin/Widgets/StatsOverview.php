@@ -5,6 +5,8 @@ namespace App\Filament\Admin\Widgets;
 use App\Models\User;
 use App\Models\Property;
 use App\Models\ContactSubmission;
+use App\Models\BlogPost;
+use App\Models\Page;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -18,6 +20,8 @@ class StatsOverview extends BaseWidget
         $activeSubscriptions = User::where('subscription_status', 'active')->count();
         $trialUsers = User::where('subscription_status', 'trialing')->count();
         $totalProperties = Property::withoutGlobalScopes()->count();
+        $unreadLeads = ContactSubmission::withoutGlobalScopes()->where('is_read', false)->count();
+        $totalBlogPosts = BlogPost::withoutGlobalScopes()->count();
 
         return [
             Stat::make('Total Tenants', $totalUsers)
@@ -36,6 +40,14 @@ class StatsOverview extends BaseWidget
                 ->description('Listings across all tenants')
                 ->descriptionIcon('heroicon-m-home')
                 ->color('info'),
+            Stat::make('Unread Leads', $unreadLeads)
+                ->description('New contact submissions')
+                ->descriptionIcon('heroicon-m-inbox')
+                ->color($unreadLeads > 0 ? 'danger' : 'success'),
+            Stat::make('Blog Posts', $totalBlogPosts)
+                ->description('Published content')
+                ->descriptionIcon('heroicon-m-newspaper')
+                ->color('gray'),
         ];
     }
 }

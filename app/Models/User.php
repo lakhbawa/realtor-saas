@@ -112,6 +112,22 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Get all pages for the user.
+     */
+    public function pages(): HasMany
+    {
+        return $this->hasMany(Page::class);
+    }
+
+    /**
+     * Get all blog posts for the user.
+     */
+    public function blogPosts(): HasMany
+    {
+        return $this->hasMany(BlogPost::class);
+    }
+
+    /**
      * Check if user has an active subscription.
      */
     public function hasActiveSubscription(): bool
