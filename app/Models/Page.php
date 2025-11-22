@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\TenantScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,16 +29,26 @@ class Page extends Model
         'sort_order' => 'integer',
     ];
 
-    protected static function booted(): void
+    protected static function boot()
     {
-        static::addGlobalScope(new TenantScope);
+        parent::boot();
 
-        static::creating(function (Page $page) {
+        // Auto-scope to authenticated user (tenant context)
+        static::addGlobalScope('tenant', function (Builder $builder) {
+            if (auth()->check() && !auth()->user()->is_admin) {
+                $builder->where('user_id', auth()->id());
+            }
+        });
+
+        // Auto-set user_id on create
+        static::creating(function ($page) {
+            if (!$page->user_id && auth()->check()) {
+                $page->user_id = auth()->id();
+            }
+
+            // Auto-generate slug if not provided
             if (empty($page->slug)) {
                 $page->slug = Str::slug($page->title);
-            }
-            if (empty($page->user_id) && auth()->check()) {
-                $page->user_id = auth()->id();
             }
         });
     }
@@ -51,5 +61,10 @@ class Page extends Model
     public function scopePublished($query)
     {
         return $query->where('is_published', true);
+    }
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('sort_order')->orderBy('created_at', 'desc');
     }
 }

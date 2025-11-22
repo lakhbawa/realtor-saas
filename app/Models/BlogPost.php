@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\TenantScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,16 +30,26 @@ class BlogPost extends Model
         'published_at' => 'datetime',
     ];
 
-    protected static function booted(): void
+    protected static function boot()
     {
-        static::addGlobalScope(new TenantScope);
+        parent::boot();
 
-        static::creating(function (BlogPost $post) {
+        // Auto-scope to authenticated user (tenant context)
+        static::addGlobalScope('tenant', function (Builder $builder) {
+            if (auth()->check() && !auth()->user()->is_admin) {
+                $builder->where('user_id', auth()->id());
+            }
+        });
+
+        // Auto-set user_id on create
+        static::creating(function ($post) {
+            if (!$post->user_id && auth()->check()) {
+                $post->user_id = auth()->id();
+            }
+
+            // Auto-generate slug if not provided
             if (empty($post->slug)) {
                 $post->slug = Str::slug($post->title);
-            }
-            if (empty($post->user_id) && auth()->check()) {
-                $post->user_id = auth()->id();
             }
         });
     }
@@ -54,5 +64,15 @@ class BlogPost extends Model
         return $query->where('is_published', true)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
+    }
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('published_at', 'desc');
+    }
+
+    public function getFeaturedImageUrlAttribute(): ?string
+    {
+        return $this->featured_image ? asset('storage/' . $this->featured_image) : null;
     }
 }
