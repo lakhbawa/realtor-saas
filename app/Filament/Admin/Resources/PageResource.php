@@ -18,26 +18,40 @@ class PageResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static ?string $navigationGroup = 'My Content';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->withoutGlobalScopes();
+        $query = parent::getEloquentQuery()->withoutGlobalScopes();
+
+        // Scope to current user if tenant (non-admin)
+        if (auth()->user()?->isTenant()) {
+            $query->where('user_id', auth()->id());
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Page Details')
+                Forms\Components\Section::make('Page Owner')
                     ->schema([
                         Forms\Components\Select::make('user_id')
                             ->label('Tenant')
                             ->options(User::where('is_admin', false)->pluck('name', 'id'))
                             ->searchable()
-                            ->required(),
+                            ->required()
+                            ->default(fn () => auth()->user()?->isTenant() ? auth()->id() : null)
+                            ->disabled(fn () => auth()->user()?->isTenant()),
+                    ])
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
+
+                Forms\Components\Section::make('Page Details')
+                    ->schema([
                         Forms\Components\TextInput::make('title')
                             ->required()
                             ->maxLength(255)
@@ -82,7 +96,8 @@ class PageResource extends Resource
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Tenant')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Columns\TextColumn::make('title')
                     ->searchable()
                     ->sortable(),
@@ -102,7 +117,8 @@ class PageResource extends Resource
                 Tables\Filters\SelectFilter::make('user_id')
                     ->label('Tenant')
                     ->options(User::where('is_admin', false)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Filters\TernaryFilter::make('is_published')
                     ->label('Published'),
             ])

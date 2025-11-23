@@ -28,7 +28,14 @@ class ContactSubmissionResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->withoutGlobalScopes();
+        $query = parent::getEloquentQuery()->withoutGlobalScopes();
+
+        // Scope to current user if tenant (non-admin)
+        if (auth()->user()?->isTenant()) {
+            $query->where('user_id', auth()->id());
+        }
+
+        return $query;
     }
 
     public static function getNavigationBadge(): ?string
@@ -51,13 +58,14 @@ class ContactSubmissionResource extends Resource
                             ->label('Tenant')
                             ->options(User::where('is_admin', false)->pluck('name', 'id'))
                             ->searchable()
-                            ->disabled(),
+                            ->disabled()
+                            ->visible(fn () => auth()->user()?->isSuperAdmin()),
                         Forms\Components\Select::make('property_id')
                             ->label('Property')
                             ->relationship('property', 'title')
                             ->disabled(),
                     ])
-                    ->columns(2),
+                    ->columns(fn () => auth()->user()?->isSuperAdmin() ? 2 : 1),
 
                 Forms\Components\Section::make('Contact Details')
                     ->schema([
@@ -93,7 +101,8 @@ class ContactSubmissionResource extends Resource
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Tenant')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Columns\TextColumn::make('name')
                     ->label('Contact Name')
                     ->searchable()
@@ -117,7 +126,8 @@ class ContactSubmissionResource extends Resource
                 Tables\Filters\SelectFilter::make('user_id')
                     ->label('Tenant')
                     ->options(User::where('is_admin', false)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Filters\TernaryFilter::make('is_read')
                     ->label('Read Status'),
             ])

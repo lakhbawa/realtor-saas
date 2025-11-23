@@ -18,9 +18,21 @@ class TestimonialResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-star';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static ?string $navigationGroup = 'My Content';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 4;
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        // Scope to current user if tenant (non-admin)
+        if (auth()->user()?->isTenant()) {
+            $query->where('user_id', auth()->id());
+        }
+
+        return $query;
+    }
 
     public static function form(Form $form): Form
     {
@@ -33,8 +45,12 @@ class TestimonialResource extends Resource
                             ->options(User::where('is_admin', false)->pluck('name', 'id'))
                             ->required()
                             ->searchable()
-                            ->preload(),
-                    ])->columns(1),
+                            ->preload()
+                            ->default(fn () => auth()->user()?->isTenant() ? auth()->id() : null)
+                            ->disabled(fn () => auth()->user()?->isTenant()),
+                    ])
+                    ->columns(1)
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
 
                 Forms\Components\Section::make('Client Information')
                     ->description('Details about the client who provided this testimonial')
@@ -152,7 +168,8 @@ class TestimonialResource extends Resource
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Tenant')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Columns\ImageColumn::make('client_photo')
                     ->label('Photo')
                     ->circular()
@@ -201,7 +218,8 @@ class TestimonialResource extends Resource
                     ->label('Tenant')
                     ->options(User::where('is_admin', false)->pluck('name', 'id'))
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Filters\TernaryFilter::make('is_published')
                     ->label('Published'),
                 Tables\Filters\TernaryFilter::make('is_featured')

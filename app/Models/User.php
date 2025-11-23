@@ -64,11 +64,42 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         if ($panel->getId() === 'admin') {
-            return $this->is_admin;
+            // Super admins always have access
+            if ($this->is_admin) {
+                return true;
+            }
+
+            // Tenant users with active subscription can access admin panel
+            // They will see only tenant-relevant resources
+            return $this->hasValidSubscription();
         }
 
         // Tenant panel - check subscription status
+        return $this->hasValidSubscription();
+    }
+
+    /**
+     * Check if user has a valid subscription (active, trialing, or past_due).
+     */
+    public function hasValidSubscription(): bool
+    {
         return in_array($this->subscription_status, ['active', 'trialing', 'past_due']);
+    }
+
+    /**
+     * Check if user is a super admin.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return (bool) $this->is_admin;
+    }
+
+    /**
+     * Check if user is a tenant (non-admin user).
+     */
+    public function isTenant(): bool
+    {
+        return !$this->is_admin;
     }
 
     /**

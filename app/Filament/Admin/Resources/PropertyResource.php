@@ -18,13 +18,20 @@ class PropertyResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-home-modern';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static ?string $navigationGroup = 'My Content';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 1;
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->withoutGlobalScopes();
+        $query = parent::getEloquentQuery()->withoutGlobalScopes();
+
+        // Scope to current user if tenant (non-admin)
+        if (auth()->user()?->isTenant()) {
+            $query->where('user_id', auth()->id());
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form
@@ -37,8 +44,11 @@ class PropertyResource extends Resource
                             ->label('Tenant')
                             ->options(User::where('is_admin', false)->pluck('name', 'id'))
                             ->searchable()
-                            ->required(),
-                    ]),
+                            ->required()
+                            ->default(fn () => auth()->user()?->isTenant() ? auth()->id() : null)
+                            ->disabled(fn () => auth()->user()?->isTenant()),
+                    ])
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
 
                 Forms\Components\Section::make('Basic Information')
                     ->schema([
@@ -180,7 +190,8 @@ class PropertyResource extends Resource
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Tenant')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Columns\ImageColumn::make('featured_image')
                     ->label('Image')
                     ->square(),
@@ -219,7 +230,8 @@ class PropertyResource extends Resource
                 Tables\Filters\SelectFilter::make('user_id')
                     ->label('Tenant')
                     ->options(User::where('is_admin', false)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()),
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'active' => 'Active',
