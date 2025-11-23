@@ -1,68 +1,32 @@
 @extends('templates.modern.layouts.app')
 
 @section('content')
-<!-- Property Hero -->
+@php
+    // Build array of all images (featured_image first, then gallery images)
+    $allImages = collect();
+    if ($property->featured_image) {
+        $allImages->push((object)['image_path' => $property->featured_image]);
+    }
+    if ($property->images->count()) {
+        $allImages = $allImages->merge($property->images);
+    }
+    $imageCount = $allImages->count();
+@endphp
+
+<!-- Property Hero - Featured Image Only -->
 <section class="relative bg-gray-900">
-    <!-- Image Gallery -->
-    <div x-data="{ activeImage: 0, showGallery: false }" class="relative">
-        @php
-            // Build array of all images (featured_image first, then gallery images)
-            $allImages = collect();
-            if ($property->featured_image) {
-                $allImages->push((object)['image_path' => $property->featured_image]);
-            }
-            if ($property->images->count()) {
-                $allImages = $allImages->merge($property->images);
-            }
-            $imageCount = $allImages->count();
-        @endphp
-        <!-- Main Image -->
-        <div class="relative h-[50vh] md:h-[60vh]">
-            @if($imageCount > 0)
-                @foreach($allImages as $index => $image)
-                    <img x-show="activeImage === {{ $index }}"
-                         x-transition:enter="transition ease-out duration-300"
-                         x-transition:enter-start="opacity-0"
-                         x-transition:enter-end="opacity-100"
-                         src="{{ Storage::url($image->image_path) }}"
-                         alt="{{ $property->title }}"
-                         class="absolute inset-0 w-full h-full object-cover">
-                @endforeach
-                <div class="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
-            @else
-                <img src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
-                     alt="{{ $property->title }}"
-                     class="w-full h-full object-cover opacity-50">
-                <div class="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
-            @endif
-
-            <!-- Navigation Arrows -->
-            @if($imageCount > 1)
-                <button @click="activeImage = activeImage === 0 ? {{ $imageCount - 1 }} : activeImage - 1"
-                        class="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                    </svg>
-                </button>
-                <button @click="activeImage = activeImage === {{ $imageCount - 1 }} ? 0 : activeImage + 1"
-                        class="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            @endif
-
-            <!-- Image Counter -->
-            @if($imageCount > 1)
-                <div class="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-2">
-                    @for($i = 0; $i < $imageCount; $i++)
-                        <button @click="activeImage = {{ $i }}"
-                                :class="activeImage === {{ $i }} ? 'bg-white' : 'bg-white/40'"
-                                class="w-2 h-2 rounded-full transition"></button>
-                    @endfor
-                </div>
-            @endif
-        </div>
+    <div class="relative h-[40vh] md:h-[50vh]">
+        @if($property->featured_image)
+            <img src="{{ Storage::url($property->featured_image) }}"
+                 alt="{{ $property->title }}"
+                 class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+        @else
+            <img src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
+                 alt="{{ $property->title }}"
+                 class="w-full h-full object-cover opacity-50">
+            <div class="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+        @endif
 
         <!-- Property Info Overlay -->
         <div class="absolute bottom-0 inset-x-0 text-white">
@@ -162,6 +126,115 @@
         </div>
     </div>
 </section>
+
+<!-- Photo Gallery -->
+@if($imageCount > 0)
+<section class="py-8 bg-white" x-data="{ lightbox: false, activeImage: 0 }">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <svg class="w-6 h-6 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Photo Gallery
+            </h2>
+            <span class="text-sm text-gray-500">{{ $imageCount }} {{ $imageCount === 1 ? 'Photo' : 'Photos' }}</span>
+        </div>
+
+        <!-- Image Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            @foreach($allImages as $index => $image)
+                <button @click="lightbox = true; activeImage = {{ $index }}"
+                        class="relative aspect-[4/3] rounded-xl overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                    <img src="{{ Storage::url($image->image_path) }}"
+                         alt="{{ $property->title }} - Image {{ $index + 1 }}"
+                         class="w-full h-full object-cover transition duration-300 group-hover:scale-110">
+                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition duration-300 flex items-center justify-center">
+                        <svg class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/>
+                        </svg>
+                    </div>
+                </button>
+            @endforeach
+        </div>
+    </div>
+
+    <!-- Lightbox Modal -->
+    <div x-show="lightbox"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @keydown.escape.window="lightbox = false"
+         @keydown.left.window="activeImage = activeImage === 0 ? {{ $imageCount - 1 }} : activeImage - 1"
+         @keydown.right.window="activeImage = activeImage === {{ $imageCount - 1 }} ? 0 : activeImage + 1"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4"
+         style="display: none;">
+
+        <!-- Close Button -->
+        <button @click="lightbox = false" class="absolute top-4 right-4 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition z-10">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+
+        <!-- Image Counter -->
+        <div class="absolute top-4 left-4 px-4 py-2 bg-white/10 rounded-full text-white text-sm">
+            <span x-text="activeImage + 1"></span> / {{ $imageCount }}
+        </div>
+
+        <!-- Previous Button -->
+        @if($imageCount > 1)
+            <button @click="activeImage = activeImage === 0 ? {{ $imageCount - 1 }} : activeImage - 1"
+                    class="absolute left-4 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>
+        @endif
+
+        <!-- Main Image -->
+        <div class="max-w-5xl max-h-[85vh] w-full">
+            @foreach($allImages as $index => $image)
+                <img x-show="activeImage === {{ $index }}"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     src="{{ Storage::url($image->image_path) }}"
+                     alt="{{ $property->title }} - Image {{ $index + 1 }}"
+                     class="w-full h-full object-contain rounded-lg">
+            @endforeach
+        </div>
+
+        <!-- Next Button -->
+        @if($imageCount > 1)
+            <button @click="activeImage = activeImage === {{ $imageCount - 1 }} ? 0 : activeImage + 1"
+                    class="absolute right-4 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        @endif
+
+        <!-- Thumbnail Strip -->
+        @if($imageCount > 1)
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 max-w-full overflow-x-auto px-4 py-2">
+                @foreach($allImages as $index => $image)
+                    <button @click="activeImage = {{ $index }}"
+                            :class="activeImage === {{ $index }} ? 'ring-2 ring-primary opacity-100' : 'opacity-50 hover:opacity-75'"
+                            class="w-16 h-12 rounded-lg overflow-hidden flex-shrink-0 transition">
+                        <img src="{{ Storage::url($image->image_path) }}"
+                             alt="Thumbnail {{ $index + 1 }}"
+                             class="w-full h-full object-cover">
+                    </button>
+                @endforeach
+            </div>
+        @endif
+    </div>
+</section>
+@endif
 
 <!-- Property Details -->
 <section class="py-12 bg-gray-50">
