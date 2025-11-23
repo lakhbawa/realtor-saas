@@ -40,7 +40,7 @@ class PropertyResource extends Resource
                             ->required(),
                     ]),
 
-                Forms\Components\Section::make('Property Details')
+                Forms\Components\Section::make('Basic Information')
                     ->schema([
                         Forms\Components\TextInput::make('title')
                             ->required()
@@ -52,23 +52,36 @@ class PropertyResource extends Resource
                             ->maxLength(255),
                         Forms\Components\RichEditor::make('description')
                             ->columnSpanFull(),
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\Select::make('status')
+                                    ->label('Property Status')
+                                    ->options([
+                                        'active' => 'Active',
+                                        'pending' => 'Pending',
+                                        'sold' => 'Sold',
+                                        'inactive' => 'Inactive',
+                                    ])
+                                    ->default('active'),
+                                Forms\Components\Select::make('listing_status')
+                                    ->label('Listing Type')
+                                    ->options([
+                                        'for_sale' => 'For Sale',
+                                        'for_rent' => 'For Rent',
+                                    ])
+                                    ->default('for_sale'),
+                                Forms\Components\Toggle::make('is_featured')
+                                    ->label('Featured Property'),
+                            ]),
+                    ])
+                    ->columns(2),
+
+                Forms\Components\Section::make('Property Details')
+                    ->schema([
                         Forms\Components\TextInput::make('price')
                             ->numeric()
                             ->prefix('$')
                             ->maxValue(999999999),
-                        Forms\Components\Select::make('status')
-                            ->options([
-                                'active' => 'Active',
-                                'pending' => 'Pending',
-                                'sold' => 'Sold',
-                                'inactive' => 'Inactive',
-                            ])
-                            ->default('active'),
-                    ])
-                    ->columns(2),
-
-                Forms\Components\Section::make('Property Features')
-                    ->schema([
                         Forms\Components\TextInput::make('bedrooms')
                             ->numeric()
                             ->minValue(0),
@@ -79,13 +92,28 @@ class PropertyResource extends Resource
                         Forms\Components\TextInput::make('square_feet')
                             ->numeric()
                             ->minValue(0),
+                        Forms\Components\TextInput::make('year_built')
+                            ->numeric()
+                            ->label('Year Built')
+                            ->minValue(1800)
+                            ->maxValue(date('Y') + 5),
                     ])
-                    ->columns(3),
+                    ->columns(5),
+
+                Forms\Components\Section::make('Features')
+                    ->schema([
+                        Forms\Components\TagsInput::make('features')
+                            ->label('Property Features')
+                            ->placeholder('Add features...')
+                            ->helperText('Press Enter to add each feature (e.g., Pool, Garage, Hardwood Floors)')
+                            ->columnSpanFull(),
+                    ]),
 
                 Forms\Components\Section::make('Location')
                     ->schema([
                         Forms\Components\TextInput::make('address')
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->columnSpanFull(),
                         Forms\Components\TextInput::make('city')
                             ->maxLength(100),
                         Forms\Components\TextInput::make('state')
@@ -93,25 +121,55 @@ class PropertyResource extends Resource
                         Forms\Components\TextInput::make('zip')
                             ->maxLength(20),
                     ])
-                    ->columns(2),
+                    ->columns(3),
 
-                Forms\Components\Section::make('Images')
+                Forms\Components\Section::make('Images & Media')
                     ->schema([
                         Forms\Components\FileUpload::make('featured_image')
+                            ->label('Main Featured Image')
                             ->image()
                             ->directory('properties')
-                            ->maxSize(2048),
+                            ->visibility('public')
+                            ->maxSize(5120)
+                            ->helperText('This is the main image shown in listings.'),
+                        Forms\Components\Repeater::make('images')
+                            ->relationship()
+                            ->label('Additional Gallery Images')
+                            ->schema([
+                                Forms\Components\FileUpload::make('image_path')
+                                    ->label('Image')
+                                    ->image()
+                                    ->directory('property-images')
+                                    ->visibility('public')
+                                    ->maxSize(5120)
+                                    ->required(),
+                                Forms\Components\TextInput::make('sort_order')
+                                    ->label('Order')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->minValue(0),
+                            ])
+                            ->columns(2)
+                            ->defaultItems(0)
+                            ->reorderable()
+                            ->reorderableWithButtons()
+                            ->collapsible()
+                            ->addActionLabel('Add Image')
+                            ->helperText('Add multiple images for the property gallery'),
+                        Forms\Components\TextInput::make('video_url')
+                            ->label('Video URL (Optional)')
+                            ->url()
+                            ->maxLength(500)
+                            ->placeholder('https://youtube.com/watch?v=...')
+                            ->helperText('YouTube or Vimeo video URL'),
                     ]),
 
                 Forms\Components\Section::make('Settings')
                     ->schema([
-                        Forms\Components\Toggle::make('is_featured')
-                            ->label('Featured Property'),
                         Forms\Components\TextInput::make('sort_order')
                             ->numeric()
                             ->default(0),
-                    ])
-                    ->columns(2),
+                    ]),
             ]);
     }
 
@@ -133,6 +191,13 @@ class PropertyResource extends Resource
                 Tables\Columns\TextColumn::make('price')
                     ->money('USD')
                     ->sortable(),
+                Tables\Columns\BadgeColumn::make('listing_status')
+                    ->label('Type')
+                    ->colors([
+                        'success' => 'for_sale',
+                        'info' => 'for_rent',
+                    ])
+                    ->formatStateUsing(fn (?string $state): string => $state === 'for_sale' ? 'For Sale' : ($state === 'for_rent' ? 'For Rent' : '-')),
                 Tables\Columns\TextColumn::make('city')
                     ->searchable(),
                 Tables\Columns\BadgeColumn::make('status')
@@ -161,6 +226,12 @@ class PropertyResource extends Resource
                         'pending' => 'Pending',
                         'sold' => 'Sold',
                         'inactive' => 'Inactive',
+                    ]),
+                Tables\Filters\SelectFilter::make('listing_status')
+                    ->label('Listing Type')
+                    ->options([
+                        'for_sale' => 'For Sale',
+                        'for_rent' => 'For Rent',
                     ]),
                 Tables\Filters\TernaryFilter::make('is_featured')
                     ->label('Featured'),

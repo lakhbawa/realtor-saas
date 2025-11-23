@@ -48,13 +48,65 @@ class SiteResource extends Resource
                             ->maxLength(255),
                         Forms\Components\TextInput::make('tagline')
                             ->maxLength(255),
+                        Forms\Components\ColorPicker::make('primary_color')
+                            ->default('#3B82F6'),
+                    ])
+                    ->columns(2),
+
+                Forms\Components\Section::make('Images')
+                    ->description('Upload professional photos and branding images')
+                    ->schema([
+                        Forms\Components\FileUpload::make('headshot')
+                            ->label('Professional Headshot')
+                            ->image()
+                            ->directory('headshots')
+                            ->visibility('public')
+                            ->maxSize(5120)
+                            ->imageResizeMode('cover')
+                            ->imageCropAspectRatio('1:1')
+                            ->imageResizeTargetWidth('600')
+                            ->imageResizeTargetHeight('600')
+                            ->helperText('A professional photo. Square aspect ratio recommended.'),
+                        Forms\Components\FileUpload::make('hero_image')
+                            ->label('Hero Background Image')
+                            ->image()
+                            ->directory('hero-images')
+                            ->visibility('public')
+                            ->maxSize(5120)
+                            ->imageResizeMode('cover')
+                            ->imageResizeTargetWidth('1920')
+                            ->imageResizeTargetHeight('1080')
+                            ->helperText('Large banner image for homepage. Landscape orientation recommended.'),
                         Forms\Components\FileUpload::make('logo_path')
                             ->label('Logo')
                             ->image()
                             ->directory('logos')
-                            ->maxSize(2048),
-                        Forms\Components\ColorPicker::make('primary_color')
-                            ->default('#3B82F6'),
+                            ->visibility('public')
+                            ->maxSize(2048)
+                            ->helperText('Business logo. PNG with transparent background recommended.'),
+                    ])
+                    ->columns(3),
+
+                Forms\Components\Section::make('Professional Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('license_number')
+                            ->label('License Number')
+                            ->maxLength(100)
+                            ->placeholder('DRE #01234567'),
+                        Forms\Components\TextInput::make('brokerage')
+                            ->label('Brokerage')
+                            ->maxLength(255)
+                            ->placeholder('Keller Williams Realty'),
+                        Forms\Components\TextInput::make('years_experience')
+                            ->label('Years of Experience')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(99),
+                        Forms\Components\TextInput::make('specialties')
+                            ->label('Specialties')
+                            ->maxLength(500)
+                            ->placeholder('Luxury Homes, First-Time Buyers')
+                            ->helperText('Comma-separated list'),
                     ])
                     ->columns(2),
 
@@ -81,8 +133,14 @@ class SiteResource extends Resource
 
                 Forms\Components\Section::make('About')
                     ->schema([
-                        Forms\Components\Textarea::make('bio')
-                            ->rows(4)
+                        Forms\Components\RichEditor::make('bio')
+                            ->label('About Me / Bio')
+                            ->toolbarButtons([
+                                'bold',
+                                'italic',
+                                'bulletList',
+                                'orderedList',
+                            ])
                             ->columnSpanFull(),
                     ]),
 
@@ -130,6 +188,9 @@ class SiteResource extends Resource
                     ->label('Tenant')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\ImageColumn::make('headshot')
+                    ->label('Photo')
+                    ->circular(),
                 Tables\Columns\TextColumn::make('user.subdomain')
                     ->label('Subdomain')
                     ->searchable()
