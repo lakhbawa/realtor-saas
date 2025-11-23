@@ -110,6 +110,58 @@ class SiteResource extends Resource
                     ])
                     ->columns(2),
 
+                Forms\Components\Section::make('Homepage Stats')
+                    ->description('These statistics are displayed on your homepage to showcase your achievements')
+                    ->schema([
+                        Forms\Components\TextInput::make('stat_properties_sold')
+                            ->label('Properties Sold')
+                            ->numeric()
+                            ->minValue(0)
+                            ->placeholder('150')
+                            ->helperText('Total number of properties sold'),
+                        Forms\Components\TextInput::make('stat_properties_sold_label')
+                            ->label('Label')
+                            ->maxLength(100)
+                            ->placeholder('Properties Sold')
+                            ->helperText('Custom label (optional)'),
+                        Forms\Components\TextInput::make('stat_sales_volume')
+                            ->label('Sales Volume ($M)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->placeholder('50')
+                            ->helperText('Total sales volume in millions'),
+                        Forms\Components\TextInput::make('stat_sales_volume_label')
+                            ->label('Label')
+                            ->maxLength(100)
+                            ->placeholder('Sales Volume')
+                            ->helperText('Custom label (optional)'),
+                        Forms\Components\TextInput::make('stat_happy_clients')
+                            ->label('Happy Clients')
+                            ->numeric()
+                            ->minValue(0)
+                            ->placeholder('200')
+                            ->helperText('Number of satisfied clients'),
+                        Forms\Components\TextInput::make('stat_happy_clients_label')
+                            ->label('Label')
+                            ->maxLength(100)
+                            ->placeholder('Happy Clients')
+                            ->helperText('Custom label (optional)'),
+                        Forms\Components\TextInput::make('stat_average_rating')
+                            ->label('Average Rating')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(5)
+                            ->step(0.1)
+                            ->placeholder('4.9')
+                            ->helperText('Average client rating (0-5)'),
+                        Forms\Components\TextInput::make('stat_average_rating_label')
+                            ->label('Label')
+                            ->maxLength(100)
+                            ->placeholder('Star Rating')
+                            ->helperText('Custom label (optional)'),
+                    ])
+                    ->columns(2),
+
                 Forms\Components\Section::make('Contact Information')
                     ->schema([
                         Forms\Components\TextInput::make('phone')

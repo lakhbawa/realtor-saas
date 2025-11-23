@@ -53,6 +53,15 @@ class SiteSettings extends Page
             'meta_title' => $site?->meta_title,
             'meta_description' => $site?->meta_description,
             'is_published' => $site?->is_published ?? false,
+            // Stats fields
+            'stat_properties_sold' => $site?->stat_properties_sold,
+            'stat_sales_volume' => $site?->stat_sales_volume,
+            'stat_happy_clients' => $site?->stat_happy_clients,
+            'stat_average_rating' => $site?->stat_average_rating,
+            'stat_properties_sold_label' => $site?->stat_properties_sold_label,
+            'stat_sales_volume_label' => $site?->stat_sales_volume_label,
+            'stat_happy_clients_label' => $site?->stat_happy_clients_label,
+            'stat_average_rating_label' => $site?->stat_average_rating_label,
         ]);
     }
 
@@ -131,6 +140,57 @@ class SiteSettings extends Page
                                     ->maxLength(500)
                                     ->placeholder('Luxury Homes, First-Time Buyers, Investment Properties')
                                     ->helperText('Comma-separated list of your specializations'),
+                            ])->columns(2),
+
+                        Forms\Components\Tabs\Tab::make('Stats')
+                            ->icon('heroicon-o-chart-bar')
+                            ->schema([
+                                Forms\Components\Placeholder::make('stats_info')
+                                    ->label('')
+                                    ->content('These statistics are displayed on your homepage to showcase your achievements.')
+                                    ->columnSpanFull(),
+                                Forms\Components\TextInput::make('stat_properties_sold')
+                                    ->label('Properties Sold')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->placeholder('150')
+                                    ->helperText('Total number of properties sold'),
+                                Forms\Components\TextInput::make('stat_properties_sold_label')
+                                    ->label('Custom Label')
+                                    ->maxLength(100)
+                                    ->placeholder('Properties Sold'),
+                                Forms\Components\TextInput::make('stat_sales_volume')
+                                    ->label('Sales Volume ($M)')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->placeholder('50')
+                                    ->helperText('Total sales volume in millions'),
+                                Forms\Components\TextInput::make('stat_sales_volume_label')
+                                    ->label('Custom Label')
+                                    ->maxLength(100)
+                                    ->placeholder('Sales Volume'),
+                                Forms\Components\TextInput::make('stat_happy_clients')
+                                    ->label('Happy Clients')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->placeholder('200')
+                                    ->helperText('Number of satisfied clients'),
+                                Forms\Components\TextInput::make('stat_happy_clients_label')
+                                    ->label('Custom Label')
+                                    ->maxLength(100)
+                                    ->placeholder('Happy Clients'),
+                                Forms\Components\TextInput::make('stat_average_rating')
+                                    ->label('Average Rating')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(5)
+                                    ->step(0.1)
+                                    ->placeholder('4.9')
+                                    ->helperText('Average client rating (0-5)'),
+                                Forms\Components\TextInput::make('stat_average_rating_label')
+                                    ->label('Custom Label')
+                                    ->maxLength(100)
+                                    ->placeholder('Star Rating'),
                             ])->columns(2),
 
                         Forms\Components\Tabs\Tab::make('Images')
@@ -284,6 +344,15 @@ class SiteSettings extends Page
             'meta_title' => $data['meta_title'],
             'meta_description' => $data['meta_description'],
             'is_published' => $data['is_published'],
+            // Stats fields
+            'stat_properties_sold' => $data['stat_properties_sold'],
+            'stat_sales_volume' => $data['stat_sales_volume'],
+            'stat_happy_clients' => $data['stat_happy_clients'],
+            'stat_average_rating' => $data['stat_average_rating'],
+            'stat_properties_sold_label' => $data['stat_properties_sold_label'],
+            'stat_sales_volume_label' => $data['stat_sales_volume_label'],
+            'stat_happy_clients_label' => $data['stat_happy_clients_label'],
+            'stat_average_rating_label' => $data['stat_average_rating_label'],
         ]);
 
         $site->save();

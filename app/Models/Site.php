@@ -32,6 +32,16 @@ class Site extends Model
         'brokerage',
         'years_experience',
         'specialties',
+        // Stats fields
+        'stat_properties_sold',
+        'stat_sales_volume',
+        'stat_happy_clients',
+        'stat_average_rating',
+        'stat_properties_sold_label',
+        'stat_sales_volume_label',
+        'stat_happy_clients_label',
+        'stat_average_rating_label',
+        // Social media
         'facebook',
         'instagram',
         'linkedin',
@@ -51,6 +61,11 @@ class Site extends Model
     {
         return [
             'is_published' => 'boolean',
+            'stat_properties_sold' => 'integer',
+            'stat_sales_volume' => 'integer',
+            'stat_happy_clients' => 'integer',
+            'stat_average_rating' => 'decimal:1',
+            'years_experience' => 'integer',
         ];
     }
 
