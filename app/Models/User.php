@@ -190,4 +190,70 @@ class User extends Authenticatable implements FilamentUser
         $domain = config('app.domain', 'myrealtorsites.local');
         return "http://{$this->subdomain}.{$domain}";
     }
+
+    /**
+     * Get a plan limit value.
+     */
+    public function getPlanLimit(string $key, mixed $default = null): mixed
+    {
+        return $this->subscription?->getLimit($key, $default) ?? $default;
+    }
+
+    /**
+     * Check if user's plan has a specific feature.
+     */
+    public function hasPlanFeature(string $key): bool
+    {
+        if ($this->is_admin) {
+            return true;
+        }
+
+        return $this->subscription?->hasFeature($key) ?? false;
+    }
+
+    /**
+     * Check if user can create more of a resource.
+     */
+    public function canCreateMore(string $limitKey, string $relation): bool
+    {
+        if ($this->is_admin) {
+            return true;
+        }
+
+        $limit = $this->getPlanLimit($limitKey);
+
+        // null or -1 means unlimited
+        if ($limit === null || $limit === -1) {
+            return true;
+        }
+
+        return $this->$relation()->count() < $limit;
+    }
+
+    /**
+     * Get remaining quota for a resource.
+     */
+    public function getRemainingQuota(string $limitKey, string $relation): ?int
+    {
+        if ($this->is_admin) {
+            return null; // unlimited
+        }
+
+        $limit = $this->getPlanLimit($limitKey);
+
+        // null or -1 means unlimited
+        if ($limit === null || $limit === -1) {
+            return null;
+        }
+
+        return max(0, $limit - $this->$relation()->count());
+    }
+
+    /**
+     * Get the current plan.
+     */
+    public function getCurrentPlan(): ?\App\Models\Plan
+    {
+        return $this->subscription?->plan;
+    }
 }
