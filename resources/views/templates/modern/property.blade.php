@@ -5,10 +5,21 @@
 <section class="relative bg-gray-900">
     <!-- Image Gallery -->
     <div x-data="{ activeImage: 0, showGallery: false }" class="relative">
+        @php
+            // Build array of all images (featured_image first, then gallery images)
+            $allImages = collect();
+            if ($property->featured_image) {
+                $allImages->push((object)['image_path' => $property->featured_image]);
+            }
+            if ($property->images->count()) {
+                $allImages = $allImages->merge($property->images);
+            }
+            $imageCount = $allImages->count();
+        @endphp
         <!-- Main Image -->
         <div class="relative h-[50vh] md:h-[60vh]">
-            @if($property->images->count())
-                @foreach($property->images as $index => $image)
+            @if($imageCount > 0)
+                @foreach($allImages as $index => $image)
                     <img x-show="activeImage === {{ $index }}"
                          x-transition:enter="transition ease-out duration-300"
                          x-transition:enter-start="opacity-0"
@@ -26,14 +37,14 @@
             @endif
 
             <!-- Navigation Arrows -->
-            @if($property->images->count() > 1)
-                <button @click="activeImage = activeImage === 0 ? {{ $property->images->count() - 1 }} : activeImage - 1"
+            @if($imageCount > 1)
+                <button @click="activeImage = activeImage === 0 ? {{ $imageCount - 1 }} : activeImage - 1"
                         class="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
                 </button>
-                <button @click="activeImage = activeImage === {{ $property->images->count() - 1 }} ? 0 : activeImage + 1"
+                <button @click="activeImage = activeImage === {{ $imageCount - 1 }} ? 0 : activeImage + 1"
                         class="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -42,13 +53,13 @@
             @endif
 
             <!-- Image Counter -->
-            @if($property->images->count() > 1)
+            @if($imageCount > 1)
                 <div class="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-2">
-                    @foreach($property->images as $index => $image)
-                        <button @click="activeImage = {{ $index }}"
-                                :class="activeImage === {{ $index }} ? 'bg-white' : 'bg-white/40'"
+                    @for($i = 0; $i < $imageCount; $i++)
+                        <button @click="activeImage = {{ $i }}"
+                                :class="activeImage === {{ $i }} ? 'bg-white' : 'bg-white/40'"
                                 class="w-2 h-2 rounded-full transition"></button>
-                    @endforeach
+                    @endfor
                 </div>
             @endif
         </div>
@@ -66,8 +77,8 @@
                 <div class="flex flex-wrap justify-between items-end gap-4">
                     <div>
                         <div class="flex items-center gap-3 mb-2">
-                            <span class="px-3 py-1 text-sm font-semibold rounded-full {{ $property->listing_status === 'for_sale' ? 'bg-green-500' : 'bg-blue-500' }}">
-                                {{ $property->listing_status === 'for_sale' ? 'For Sale' : 'For Rent' }}
+                            <span class="px-3 py-1 text-sm font-semibold rounded-full {{ ($property->listing_status ?? 'for_sale') === 'for_sale' ? 'bg-green-500' : 'bg-blue-500' }}">
+                                {{ ($property->listing_status ?? 'for_sale') === 'for_sale' ? 'For Sale' : 'For Rent' }}
                             </span>
                             @if($property->is_featured)
                                 <span class="px-3 py-1 text-sm font-semibold bg-yellow-500 rounded-full">Featured</span>
@@ -84,7 +95,7 @@
                     </div>
                     <div class="text-right">
                         <p class="text-4xl md:text-5xl font-bold text-primary">${{ number_format($property->price) }}</p>
-                        @if($property->listing_status === 'for_rent')
+                        @if(($property->listing_status ?? 'for_sale') === 'for_rent')
                             <span class="text-white/60">per month</span>
                         @endif
                     </div>
