@@ -18,6 +18,7 @@ Route::middleware(['tenant'])->group(function () {
     Route::get('/properties', [PublicSiteController::class, 'properties'])->name('tenant.properties');
     Route::get('/properties/{slug}', [PublicSiteController::class, 'property'])->name('tenant.property');
     Route::get('/about', [PublicSiteController::class, 'about'])->name('tenant.about');
+    Route::get('/testimonials', [PublicSiteController::class, 'testimonials'])->name('tenant.testimonials');
     Route::get('/contact', [PublicSiteController::class, 'contact'])->name('tenant.contact');
     Route::post('/contact', [PublicSiteController::class, 'submitContact'])->name('tenant.contact.submit');
 

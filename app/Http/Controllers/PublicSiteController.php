@@ -78,9 +78,10 @@ class PublicSiteController extends Controller
             ->get();
 
         $testimonials = Testimonial::withoutGlobalScopes()
+            ->with('property')
             ->where('user_id', $tenant->id)
             ->where('is_published', true)
-            ->latest()
+            ->ordered()
             ->take(3)
             ->get();
 
@@ -184,14 +185,56 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
 
         $testimonials = Testimonial::withoutGlobalScopes()
+            ->with('property')
             ->where('user_id', $tenant->id)
             ->where('is_published', true)
-            ->latest()
+            ->ordered()
             ->take(6)
             ->get();
 
         return $this->view('about', [
             'testimonials' => $testimonials,
+        ]);
+    }
+
+    public function testimonials()
+    {
+        $tenant = $this->getTenant();
+
+        // Get featured testimonials first
+        $featuredTestimonials = Testimonial::withoutGlobalScopes()
+            ->with('property')
+            ->where('user_id', $tenant->id)
+            ->where('is_published', true)
+            ->where('is_featured', true)
+            ->ordered()
+            ->get();
+
+        // Get all other testimonials
+        $testimonials = Testimonial::withoutGlobalScopes()
+            ->with('property')
+            ->where('user_id', $tenant->id)
+            ->where('is_published', true)
+            ->where('is_featured', false)
+            ->ordered()
+            ->paginate(12);
+
+        // Calculate stats
+        $totalTestimonials = Testimonial::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('is_published', true)
+            ->count();
+
+        $averageRating = Testimonial::withoutGlobalScopes()
+            ->where('user_id', $tenant->id)
+            ->where('is_published', true)
+            ->avg('rating');
+
+        return $this->view('testimonials', [
+            'featuredTestimonials' => $featuredTestimonials,
+            'testimonials' => $testimonials,
+            'totalTestimonials' => $totalTestimonials,
+            'averageRating' => round($averageRating, 1),
         ]);
     }
 

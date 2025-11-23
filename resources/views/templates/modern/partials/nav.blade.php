@@ -19,6 +19,9 @@
                 <a href="{{ route('tenant.properties') }}" class="text-gray-700 hover:text-primary transition {{ request()->routeIs('tenant.properties*') ? 'text-primary font-semibold' : '' }}">
                     Properties
                 </a>
+                <a href="{{ route('tenant.testimonials') }}" class="text-gray-700 hover:text-primary transition {{ request()->routeIs('tenant.testimonials') ? 'text-primary font-semibold' : '' }}">
+                    Testimonials
+                </a>
                 <a href="{{ route('tenant.blog') }}" class="text-gray-700 hover:text-primary transition {{ request()->routeIs('tenant.blog*') ? 'text-primary font-semibold' : '' }}">
                     Blog
                 </a>
@@ -54,6 +57,7 @@
         <div class="px-4 py-3 space-y-3">
             <a href="{{ route('tenant.home') }}" class="block text-gray-700 hover:text-primary">Home</a>
             <a href="{{ route('tenant.properties') }}" class="block text-gray-700 hover:text-primary">Properties</a>
+            <a href="{{ route('tenant.testimonials') }}" class="block text-gray-700 hover:text-primary">Testimonials</a>
             <a href="{{ route('tenant.blog') }}" class="block text-gray-700 hover:text-primary">Blog</a>
             <a href="{{ route('tenant.about') }}" class="block text-gray-700 hover:text-primary">About</a>
             @if(isset($navPages) && $navPages->count())

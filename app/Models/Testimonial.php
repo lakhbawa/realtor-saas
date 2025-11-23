@@ -15,10 +15,17 @@ class Testimonial extends Model
      */
     protected $fillable = [
         'user_id',
+        'property_id',
         'client_name',
+        'client_photo',
+        'client_location',
         'content',
+        'transaction_type',
+        'transaction_date',
         'rating',
+        'video_url',
         'is_published',
+        'is_featured',
         'sort_order',
     ];
 
@@ -32,7 +39,9 @@ class Testimonial extends Model
         return [
             'rating' => 'integer',
             'is_published' => 'boolean',
+            'is_featured' => 'boolean',
             'sort_order' => 'integer',
+            'transaction_date' => 'date',
         ];
     }
 
@@ -67,11 +76,27 @@ class Testimonial extends Model
     }
 
     /**
+     * Get the property associated with this testimonial.
+     */
+    public function property(): BelongsTo
+    {
+        return $this->belongsTo(Property::class);
+    }
+
+    /**
      * Scope a query to only include published testimonials.
      */
     public function scopePublished($query)
     {
         return $query->where('is_published', true);
+    }
+
+    /**
+     * Scope a query to only include featured testimonials.
+     */
+    public function scopeFeatured($query)
+    {
+        return $query->where('is_featured', true);
     }
 
     /**
@@ -92,5 +117,32 @@ class Testimonial extends Model
             $stars .= $i <= $this->rating ? '★' : '☆';
         }
         return $stars;
+    }
+
+    /**
+     * Get the transaction type label.
+     */
+    public function getTransactionTypeLabelAttribute(): ?string
+    {
+        return match($this->transaction_type) {
+            'bought' => 'Bought a Home',
+            'sold' => 'Sold a Home',
+            'rented' => 'Rented a Home',
+            'bought_sold' => 'Bought & Sold',
+            default => null,
+        };
+    }
+
+    /**
+     * Get client initials for avatar fallback.
+     */
+    public function getClientInitialsAttribute(): string
+    {
+        $words = explode(' ', $this->client_name);
+        $initials = '';
+        foreach (array_slice($words, 0, 2) as $word) {
+            $initials .= strtoupper(substr($word, 0, 1));
+        }
+        return $initials;
     }
 }

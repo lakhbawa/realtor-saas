@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Filament\Tenant\Resources;
+namespace App\Filament\Admin\Resources;
 
-use App\Filament\Tenant\Resources\TestimonialResource\Pages;
+use App\Filament\Admin\Resources\TestimonialResource\Pages;
 use App\Models\Property;
 use App\Models\Testimonial;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -19,12 +20,22 @@ class TestimonialResource extends Resource
 
     protected static ?string $navigationGroup = 'Content';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
+                Forms\Components\Section::make('Ownership')
+                    ->schema([
+                        Forms\Components\Select::make('user_id')
+                            ->label('Tenant (Owner)')
+                            ->options(User::where('is_admin', false)->pluck('name', 'id'))
+                            ->required()
+                            ->searchable()
+                            ->preload(),
+                    ])->columns(1),
+
                 Forms\Components\Section::make('Client Information')
                     ->description('Details about the client who provided this testimonial')
                     ->schema([
@@ -84,8 +95,13 @@ class TestimonialResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('property_id')
                             ->label('Related Property')
-                            ->options(function () {
-                                return Property::query()
+                            ->options(function (Forms\Get $get) {
+                                $userId = $get('user_id');
+                                if (!$userId) {
+                                    return [];
+                                }
+                                return Property::withoutGlobalScopes()
+                                    ->where('user_id', $userId)
                                     ->orderBy('title')
                                     ->pluck('title', 'id');
                             })
@@ -115,7 +131,7 @@ class TestimonialResource extends Resource
                         Forms\Components\Toggle::make('is_published')
                             ->label('Published')
                             ->default(true)
-                            ->helperText('Show this testimonial on your website'),
+                            ->helperText('Show this testimonial on the website'),
                         Forms\Components\Toggle::make('is_featured')
                             ->label('Featured')
                             ->default(false)
@@ -133,6 +149,10 @@ class TestimonialResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('user.name')
+                    ->label('Tenant')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\ImageColumn::make('client_photo')
                     ->label('Photo')
                     ->circular()
@@ -163,14 +183,6 @@ class TestimonialResource extends Resource
                     ->formatStateUsing(fn (int $state): string => str_repeat('★', $state) . str_repeat('☆', 5 - $state))
                     ->html()
                     ->color('warning'),
-                Tables\Columns\TextColumn::make('content')
-                    ->limit(50)
-                    ->wrap()
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('property.title')
-                    ->label('Property')
-                    ->limit(30)
-                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('is_featured')
                     ->boolean()
                     ->label('Featured')
@@ -179,13 +191,17 @@ class TestimonialResource extends Resource
                 Tables\Columns\IconColumn::make('is_published')
                     ->boolean()
                     ->label('Published'),
-                Tables\Columns\TextColumn::make('transaction_date')
-                    ->label('Date')
-                    ->date('M Y')
+                Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('user_id')
+                    ->label('Tenant')
+                    ->options(User::where('is_admin', false)->pluck('name', 'id'))
+                    ->searchable()
+                    ->preload(),
                 Tables\Filters\TernaryFilter::make('is_published')
                     ->label('Published'),
                 Tables\Filters\TernaryFilter::make('is_featured')
@@ -197,14 +213,6 @@ class TestimonialResource extends Resource
                         'rented' => 'Rented',
                         'bought_sold' => 'Bought & Sold',
                     ]),
-                Tables\Filters\SelectFilter::make('rating')
-                    ->options([
-                        5 => '5 Stars',
-                        4 => '4 Stars',
-                        3 => '3 Stars',
-                        2 => '2 Stars',
-                        1 => '1 Star',
-                    ]),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -215,8 +223,7 @@ class TestimonialResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('sort_order')
-            ->reorderable('sort_order');
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getRelations(): array
