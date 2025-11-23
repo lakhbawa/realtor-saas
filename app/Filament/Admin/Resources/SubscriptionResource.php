@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\SubscriptionResource\Pages;
+use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use Filament\Forms;
@@ -38,16 +39,17 @@ class SubscriptionResource extends Resource
                             ->searchable()
                             ->required()
                             ->disabled(fn ($record) => $record !== null),
+                        Forms\Components\Select::make('plan_id')
+                            ->label('Plan')
+                            ->options(Plan::active()->ordered()->pluck('name', 'id'))
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('billing_cycle')
+                            ->options(Subscription::BILLING_CYCLES)
+                            ->default('monthly')
+                            ->required(),
                         Forms\Components\Select::make('status')
-                            ->options([
-                                'incomplete' => 'Incomplete',
-                                'incomplete_expired' => 'Incomplete Expired',
-                                'trialing' => 'Trialing',
-                                'active' => 'Active',
-                                'past_due' => 'Past Due',
-                                'canceled' => 'Canceled',
-                                'unpaid' => 'Unpaid',
-                            ])
+                            ->options(Subscription::STATUSES)
                             ->required(),
                     ])
                     ->columns(2),
@@ -63,14 +65,20 @@ class SubscriptionResource extends Resource
                     ])
                     ->columns(2),
 
-                Forms\Components\Section::make('Dates')
+                Forms\Components\Section::make('Billing Period')
                     ->schema([
+                        Forms\Components\DateTimePicker::make('current_period_start')
+                            ->label('Current Period Start'),
+                        Forms\Components\DateTimePicker::make('current_period_end')
+                            ->label('Current Period End'),
                         Forms\Components\DateTimePicker::make('trial_ends_at')
                             ->label('Trial Ends At'),
                         Forms\Components\DateTimePicker::make('ends_at')
                             ->label('Subscription Ends At'),
+                        Forms\Components\DateTimePicker::make('canceled_at')
+                            ->label('Canceled At'),
                     ])
-                    ->columns(2),
+                    ->columns(3),
             ]);
     }
 
@@ -84,7 +92,15 @@ class SubscriptionResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('user.email')
                     ->label('Email')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('plan.name')
+                    ->label('Plan')
+                    ->sortable()
+                    ->badge(),
+                Tables\Columns\TextColumn::make('billing_cycle')
+                    ->label('Billing')
+                    ->formatStateUsing(fn ($state) => Subscription::BILLING_CYCLES[$state] ?? ucfirst($state)),
                 Tables\Columns\BadgeColumn::make('status')
                     ->colors([
                         'success' => 'active',
@@ -92,33 +108,27 @@ class SubscriptionResource extends Resource
                         'danger' => fn ($state) => in_array($state, ['canceled', 'unpaid', 'incomplete_expired']),
                         'secondary' => 'incomplete',
                     ]),
+                Tables\Columns\TextColumn::make('current_period_end')
+                    ->label('Renews')
+                    ->date()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('stripe_subscription_id')
                     ->label('Stripe ID')
-                    ->toggleable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->limit(20),
-                Tables\Columns\TextColumn::make('trial_ends_at')
-                    ->label('Trial Ends')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('ends_at')
-                    ->label('Ends At')
-                    ->dateTime()
-                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('plan_id')
+                    ->label('Plan')
+                    ->options(Plan::pluck('name', 'id')),
+                Tables\Filters\SelectFilter::make('billing_cycle')
+                    ->options(Subscription::BILLING_CYCLES),
                 Tables\Filters\SelectFilter::make('status')
-                    ->options([
-                        'incomplete' => 'Incomplete',
-                        'trialing' => 'Trialing',
-                        'active' => 'Active',
-                        'past_due' => 'Past Due',
-                        'canceled' => 'Canceled',
-                        'unpaid' => 'Unpaid',
-                    ]),
+                    ->options(Subscription::STATUSES),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
