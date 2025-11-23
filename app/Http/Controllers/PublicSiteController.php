@@ -69,6 +69,7 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
 
         $featuredProperties = Property::withoutGlobalScopes()
+            ->with('images')
             ->where('user_id', $tenant->id)
             ->where('status', 'active')
             ->where('is_featured', true)
@@ -138,7 +139,7 @@ class PublicSiteController extends Controller
             });
         }
 
-        $properties = $query->latest()->paginate(12);
+        $properties = $query->with('images')->latest()->paginate(12);
 
         return $this->view('properties', [
             'properties' => $properties,
@@ -150,6 +151,7 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
 
         $property = Property::withoutGlobalScopes()
+            ->with('images')
             ->where('user_id', $tenant->id)
             ->where('slug', $slug)
             ->where('status', 'active')
@@ -157,6 +159,7 @@ class PublicSiteController extends Controller
 
         // Get related properties by similar price range or location
         $relatedProperties = Property::withoutGlobalScopes()
+            ->with('images')
             ->where('user_id', $tenant->id)
             ->where('id', '!=', $property->id)
             ->where('status', 'active')
