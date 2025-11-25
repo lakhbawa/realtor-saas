@@ -12,6 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->trustProxies(at: '*'); // fixes livewire file upload
         $middleware->alias([
             'tenant' => \App\Http\Middleware\TenantMiddleware::class,
             'subscription.active' => \App\Http\Middleware\EnsureSubscriptionActive::class,
