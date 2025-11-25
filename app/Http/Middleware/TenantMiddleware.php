@@ -18,41 +18,45 @@ class TenantMiddleware
         $host = $request->getHost();
         $baseDomain = config('app.base_domain', 'myrealtorsites.com');
 
-        // Extract subdomain from host
-        $subdomain = $this->extractSubdomain($host, $baseDomain);
-
         // Find the site and tenant
         $site = null;
         $tenant = null;
 
-        if ($subdomain) {
-            // Skip reserved subdomains
-            $reserved = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'dashboard'];
-            if (in_array($subdomain, $reserved)) {
-                return $next($request);
-            }
+        // First, try to find by custom domain (exact match)
+        $site = Site::where('custom_domain', $host)
+            ->where('custom_domain_verified', true)
+            ->with('tenant')
+            ->first();
 
-            // Find the site by subdomain and eager load tenant
-            $site = Site::where('subdomain', $subdomain)
-                ->with('tenant')
-                ->first();
+        // If not found by custom domain, try subdomain
+        if (!$site) {
+            $subdomain = $this->extractSubdomain($host, $baseDomain);
 
-            if (!$site) {
-                abort(404, 'Site not found');
-            }
+            if ($subdomain) {
+                // Skip reserved subdomains
+                $reserved = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'dashboard'];
+                if (in_array($subdomain, $reserved)) {
+                    return $next($request);
+                }
 
-            $tenant = $site->tenant;
-        } else {
-            // For development/testing: use first site with tenant that has valid subscription
-            if ($this->isLocalDevelopment($host)) {
+                // Find the site by subdomain and eager load tenant
+                $site = Site::where('subdomain', $subdomain)
+                    ->with('tenant')
+                    ->first();
+
+                if (!$site) {
+                    abort(404, 'Site not found');
+                }
+            } elseif ($this->isLocalDevelopment($host)) {
+                // For development/testing: use first site with tenant that has valid subscription
                 $site = Site::whereHas('tenant', function ($query) {
                     $query->whereIn('subscription_status', ['active', 'trialing']);
                 })->with('tenant')->first();
-
-                if ($site) {
-                    $tenant = $site->tenant;
-                }
             }
+        }
+
+        if ($site) {
+            $tenant = $site->tenant;
         }
 
         if (!$site || !$tenant) {

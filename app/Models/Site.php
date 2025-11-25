@@ -15,6 +15,8 @@ class Site extends Model
     protected $fillable = [
         'tenant_id',
         'subdomain',
+        'custom_domain',
+        'custom_domain_verified',
         'updated_by',
         'template_id',
         'site_name',
@@ -63,6 +65,7 @@ class Site extends Model
     {
         return [
             'is_published' => 'boolean',
+            'custom_domain_verified' => 'boolean',
             'stat_properties_sold' => 'integer',
             'stat_sales_volume' => 'integer',
             'stat_happy_clients' => 'integer',
@@ -106,11 +109,51 @@ class Site extends Model
 
     /**
      * Get the public URL for this site.
+     * Prefers custom domain if set and verified.
      */
     public function url(): string
     {
+        // Use custom domain if verified
+        if ($this->custom_domain && $this->custom_domain_verified) {
+            return "https://{$this->custom_domain}";
+        }
+
+        // Fallback to subdomain
         $domain = config('app.base_domain', config('app.url'));
         return "https://{$this->subdomain}.{$domain}";
+    }
+
+    /**
+     * Get the subdomain URL (ignores custom domain).
+     */
+    public function subdomainUrl(): string
+    {
+        $domain = config('app.base_domain', config('app.url'));
+        return "https://{$this->subdomain}.{$domain}";
+    }
+
+    /**
+     * Get the custom domain URL (if set).
+     */
+    public function customDomainUrl(): ?string
+    {
+        return $this->custom_domain ? "https://{$this->custom_domain}" : null;
+    }
+
+    /**
+     * Check if site uses a custom domain.
+     */
+    public function hasCustomDomain(): bool
+    {
+        return !empty($this->custom_domain) && $this->custom_domain_verified;
+    }
+
+    /**
+     * Check if custom domain is pending verification.
+     */
+    public function customDomainPendingVerification(): bool
+    {
+        return !empty($this->custom_domain) && !$this->custom_domain_verified;
     }
 
     /**
