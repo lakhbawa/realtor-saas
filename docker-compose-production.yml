@@ -27,7 +27,7 @@ services:
       - ./:/var/www
       - ./docker/config/php/production.ini:/usr/local/etc/php/conf.d/local.ini
       # Mount traefik dynamic config directory for write access (traefik:sync command)
-      - /www/traefik_dynamic:/traefik-config/realtor.yml
+      - /www/traefik_dynamic:/traefik-config
     networks:
       - app-network
     #Nginx Service
