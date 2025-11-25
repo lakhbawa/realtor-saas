@@ -6,8 +6,14 @@ This guide explains how to configure Cloudflare DNS for your multi-tenant realto
 
 Your multi-tenant architecture requires two types of DNS configurations:
 
-1. **Wildcard Subdomain** - For all tenant subdomains (`*.myrealtorsites.com`)
+1. **Wildcard Subdomain** - For all tenant subdomains (e.g., `*.realtor.clearmesh.ca` or `*.myrealtorsites.com`)
 2. **Custom Domains** - For tenant-specific custom domains (`www.johndoe.com`)
+
+**Example with your domain:**
+- Base domain: `clearmesh.ca`
+- Service subdomain: `realtor.clearmesh.ca`
+- Wildcard for tenants: `*.realtor.clearmesh.ca`
+- Tenant subdomains: `johndoe.realtor.clearmesh.ca`, `janedoe.realtor.clearmesh.ca`
 
 ---
 
@@ -33,6 +39,32 @@ Your multi-tenant architecture requires two types of DNS configurations:
 
 Add the following DNS records in Cloudflare:
 
+**For domain: `clearmesh.ca` (Your domain)**
+
+#### A Record (Service Subdomain - realtor)
+```
+Type: A
+Name: realtor
+Content: YOUR_SERVER_IP
+Proxy: ☐ DNS Only (Grey Cloud) - Recommended
+TTL: Auto
+```
+This creates: `realtor.clearmesh.ca`
+
+#### A Record (Wildcard for Tenants) - **CRITICAL for Multi-Tenant**
+```
+Type: A
+Name: *.realtor
+Content: YOUR_SERVER_IP
+Proxy: ⚠️ DNS Only (Grey Cloud) - See note below
+TTL: Auto
+```
+This creates: `*.realtor.clearmesh.ca` (johndoe.realtor.clearmesh.ca, janedoe.realtor.clearmesh.ca, etc.)
+
+---
+
+**Alternative setup for standalone domain (e.g., `myrealtorsites.com`):**
+
 #### A Record (Root Domain)
 ```
 Type: A
@@ -42,16 +74,7 @@ Proxy: ☑️ Proxied (Orange Cloud)
 TTL: Auto
 ```
 
-#### A Record (WWW)
-```
-Type: A
-Name: www
-Content: YOUR_SERVER_IP
-Proxy: ☑️ Proxied (Orange Cloud)
-TTL: Auto
-```
-
-#### A Record (Wildcard Subdomain) - **CRITICAL for Multi-Tenant**
+#### A Record (Wildcard Subdomain)
 ```
 Type: A
 Name: *
