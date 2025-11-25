@@ -14,6 +14,7 @@ class Site extends Model
      */
     protected $fillable = [
         'tenant_id',
+        'subdomain',
         'updated_by',
         'template_id',
         'site_name',
@@ -101,6 +102,15 @@ class Site extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(Template::class);
+    }
+
+    /**
+     * Get the public URL for this site.
+     */
+    public function url(): string
+    {
+        $domain = config('app.base_domain', config('app.url'));
+        return "https://{$this->subdomain}.{$domain}";
     }
 
     /**

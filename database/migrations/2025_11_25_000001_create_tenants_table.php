@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('tenants', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // Company/Organization name
-            $table->string('subdomain', 100)->unique();
             $table->string('stripe_customer_id')->nullable()->index();
             $table->string('stripe_subscription_id')->nullable()->index();
             $table->string('subscription_status', 50)->default('incomplete')->index();

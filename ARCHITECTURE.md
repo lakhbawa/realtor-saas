@@ -25,22 +25,28 @@ User (subdomain, subscription)
 
 ```
 Tenant (Organization/Company)
-  ├─ subdomain (unique)
   ├─ subscription/billing
   ├─ M:N Users (team members with roles)
-  ├─ 1:1 Site
+  ├─ 1:N Sites (each with unique subdomain)
   └─ 1:N Properties, Pages, BlogPosts, etc.
+
+Site
+  ├─ subdomain (unique)
+  ├─ belongsTo Tenant
+  └─ website configuration
 
 User (Authentication)
   └─ M:N Tenants (can belong to multiple organizations)
 ```
 
 **Benefits:**
-- Subdomain tied to Tenant (organization)
+- Subdomain tied to Site (allows multiple sites per tenant)
 - Multiple users can collaborate on same tenant
+- One tenant can manage multiple branded sites/subdomains
 - Role-based access control (owner, admin, editor, member, viewer)
 - Team billing (subscription belongs to tenant)
 - Users can be members of multiple tenants
+- Perfect for agencies managing multiple client sites
 - Scalable for enterprise features
 
 ---
@@ -56,7 +62,6 @@ The primary entity representing an organization/realtor company.
 |--------|------|-------------|
 | `id` | bigint | Primary key |
 | `name` | string | Company/Organization name |
-| `subdomain` | string (unique) | Subdomain identifier |
 | `stripe_customer_id` | string | Stripe customer ID |
 | `stripe_subscription_id` | string | Stripe subscription ID |
 | `subscription_status` | string | active, trialing, past_due, etc. |
@@ -84,7 +89,7 @@ Authentication entity representing individual users.
 | `email` | string (unique) | Email address |
 | `password` | string | Hashed password |
 | `is_admin` | boolean | Super admin flag |
-| **Removed:** | `subdomain` | ❌ Moved to tenants |
+| **Removed:** | `subdomain` | ❌ Moved to sites |
 | **Removed:** | `stripe_*` | ❌ Moved to tenants |
 | **Removed:** | `subscription_status` | ❌ Moved to tenants |
 
@@ -95,10 +100,13 @@ All content tables now reference `tenant_id` instead of `user_id`:
 #### `sites`
 | Column | Type | Description |
 |--------|------|-------------|
-| `tenant_id` | foreignId (unique) | References tenants.id |
+| `tenant_id` | foreignId (indexed) | References tenants.id |
+| `subdomain` | string (unique) | Subdomain identifier |
 | `updated_by` | foreignId | Last user who updated |
 | `template_id` | foreignId | Template used |
 | ... | | Site configuration fields |
+
+**Note:** One tenant can have multiple sites. Each site has its own unique subdomain.
 
 #### `properties`
 | Column | Type | Description |
@@ -133,7 +141,8 @@ All content tables now reference `tenant_id` instead of `user_id`:
 ```php
 $tenant->users()              // All team members (BelongsToMany)
 $tenant->owners()             // Team members with 'owner' role
-$tenant->site()               // Website configuration (HasOne)
+$tenant->sites()              // All websites (HasMany) - NEW!
+$tenant->site()               // Primary/first site (HasOne) - for backwards compatibility
 $tenant->subscription()       // Billing subscription (HasOne)
 $tenant->properties()         // Real estate listings (HasMany)
 $tenant->pages()              // Custom pages (HasMany)
@@ -147,7 +156,7 @@ $tenant->contactSubmissions() // Contact form submissions (HasMany)
 $tenant->hasValidSubscription()           // Check if subscription is valid
 $tenant->hasActiveSubscription()          // Check if status is 'active'
 $tenant->onTrial()                        // Check if on trial period
-$tenant->url()                            // Get public URL
+$tenant->url()                            // Get primary site URL (deprecated)
 $tenant->hasAccessToFeature($feature)     // Check plan feature access
 $tenant->getPlanLimit($limit)             // Get plan limit value
 $tenant->canCreateMore($resourceType)     // Check quota before creation
@@ -222,9 +231,12 @@ $tenantUser->canManage() // Check if can manage settings
    Subdomain: johndoe
    ```
 
-2. **Find Tenant** by subdomain
+2. **Find Site** by subdomain (and eager load tenant)
    ```php
-   $tenant = Tenant::where('subdomain', 'johndoe')->first();
+   $site = Site::where('subdomain', 'johndoe')
+       ->with('tenant')
+       ->first();
+   $tenant = $site->tenant;
    ```
 
 3. **Validate Subscription** status
@@ -236,8 +248,10 @@ $tenantUser->canManage() // Check if can manage settings
 
 4. **Bind to Container** for global access
    ```php
+   app()->instance('site', $site);
    app()->instance('tenant', $tenant);
    app()->instance('currentTenant', $tenant);
+   app()->instance('currentSite', $site);
    ```
 
 5. **Set User Context** if authenticated
@@ -250,7 +264,7 @@ $tenantUser->canManage() // Check if can manage settings
 The following subdomains are reserved and will not be resolved:
 - `www`, `admin`, `api`, `app`, `mail`, `ftp`, `dashboard`
 
-### Accessing Current Tenant
+### Accessing Current Tenant & Site
 
 ```php
 // In Controllers
@@ -258,9 +272,13 @@ $tenant = app('currentTenant');
 $tenant = request()->get('tenant');
 $tenant = auth()->user()->currentTenant();
 
+$site = app('currentSite');
+$site = request()->get('site');
+
 // In Views
 {{ $tenant->name }}
-{{ $tenant->url() }}
+{{ $site->subdomain }}
+{{ $site->url() }}
 
 // In Models (via global scopes)
 // Automatically filtered by tenant_id
@@ -436,11 +454,36 @@ php artisan migrate
 
 ## API Reference
 
+### Site Methods
+
+```php
+// Site instance - resolved by subdomain
+$site = Site::where('subdomain', 'johndoe')->first();
+
+// Relationships
+$site->tenant()      // Tenant that owns this site
+$site->updatedBy()   // User who last updated
+$site->template()    // Template used
+
+// URL
+$site->url()  // https://johndoe.myrealtorsites.com
+
+// Configuration
+$site->isSetupComplete()        // bool
+$site->getSetupProgressAttribute()  // int (0-100)
+```
+
 ### Tenant Methods
 
 ```php
 // Tenant instance
-$tenant = Tenant::where('subdomain', 'johndoe')->first();
+$tenant = Tenant::find($id);
+// OR via site
+$tenant = $site->tenant;
+
+// Sites
+$tenant->sites()     // All sites (Collection)
+$tenant->site()      // Primary/first site
 
 // Subscription
 $tenant->hasValidSubscription()     // bool
@@ -460,8 +503,8 @@ $tenant->addUser($user, 'editor')            // void
 $tenant->removeUser($user)                   // void
 $tenant->updateUserRole($user, 'admin')      // void
 
-// URLs
-$tenant->url()  // https://johndoe.myrealtorsites.com
+// URLs (deprecated - use $site->url() instead)
+$tenant->url()  // Primary site URL (deprecated)
 ```
 
 ### User Methods

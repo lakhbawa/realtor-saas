@@ -20,7 +20,6 @@ class Tenant extends Model
      */
     protected $fillable = [
         'name',
-        'subdomain',
         'stripe_customer_id',
         'stripe_subscription_id',
         'subscription_status',
@@ -40,11 +39,19 @@ class Tenant extends Model
     }
 
     /**
-     * Get the site for the tenant.
+     * Get all sites for the tenant.
+     */
+    public function sites(): HasMany
+    {
+        return $this->hasMany(Site::class);
+    }
+
+    /**
+     * Get the primary/first site for the tenant (for backwards compatibility).
      */
     public function site(): HasOne
     {
-        return $this->hasOne(Site::class);
+        return $this->hasOne(Site::class)->oldestOfMany();
     }
 
     /**
@@ -140,12 +147,13 @@ class Tenant extends Model
     }
 
     /**
-     * Get the tenant's public URL.
+     * Get the tenant's primary site URL (deprecated - use site()->url() instead).
+     * @deprecated Use $tenant->site->url() or $tenant->sites()->first()->url()
      */
     public function url(): string
     {
-        $domain = config('app.base_domain', config('app.url'));
-        return "https://{$this->subdomain}.{$domain}";
+        $primarySite = $this->sites()->first();
+        return $primarySite ? $primarySite->url() : '';
     }
 
     /**

@@ -16,15 +16,15 @@ return new class extends Migration
             $table->dropForeign(['user_id']);
             $table->dropUnique(['user_id']);
 
-            // Add tenant_id
-            $table->foreignId('tenant_id')->after('id')->constrained()->onDelete('cascade');
+            // Add tenant_id (no unique constraint - one tenant can have multiple sites)
+            $table->foreignId('tenant_id')->after('id')->constrained()->onDelete('cascade')->index();
 
             // Keep user_id but make it nullable and non-unique (for tracking who last edited)
             $table->foreignId('user_id')->nullable()->change();
             $table->renameColumn('user_id', 'updated_by');
 
-            // Add unique constraint on tenant_id (one site per tenant)
-            $table->unique('tenant_id');
+            // Add subdomain field with unique constraint
+            $table->string('subdomain', 100)->unique()->after('tenant_id');
         });
     }
 
@@ -35,8 +35,8 @@ return new class extends Migration
     {
         Schema::table('sites', function (Blueprint $table) {
             $table->dropForeign(['tenant_id']);
-            $table->dropUnique(['tenant_id']);
-            $table->dropColumn('tenant_id');
+            $table->dropUnique(['subdomain']);
+            $table->dropColumn(['tenant_id', 'subdomain']);
 
             $table->renameColumn('updated_by', 'user_id');
             $table->foreignId('user_id')->change();

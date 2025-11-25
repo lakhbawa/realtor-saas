@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Tenant;
+use App\Models\Site;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,7 +11,7 @@ class TenantMiddleware
 {
     /**
      * Handle an incoming request.
-     * Resolves the tenant from the subdomain and makes it available.
+     * Resolves the site and tenant from the subdomain and makes them available.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -21,7 +21,8 @@ class TenantMiddleware
         // Extract subdomain from host
         $subdomain = $this->extractSubdomain($host, $baseDomain);
 
-        // Find the tenant
+        // Find the site and tenant
+        $site = null;
         $tenant = null;
 
         if ($subdomain) {
@@ -31,21 +32,30 @@ class TenantMiddleware
                 return $next($request);
             }
 
-            // Find the tenant by subdomain
-            $tenant = Tenant::where('subdomain', $subdomain)->first();
+            // Find the site by subdomain and eager load tenant
+            $site = Site::where('subdomain', $subdomain)
+                ->with('tenant')
+                ->first();
 
-            if (!$tenant) {
+            if (!$site) {
                 abort(404, 'Site not found');
             }
+
+            $tenant = $site->tenant;
         } else {
-            // For development/testing: use first tenant with valid subscription
+            // For development/testing: use first site with tenant that has valid subscription
             if ($this->isLocalDevelopment($host)) {
-                $tenant = Tenant::whereIn('subscription_status', ['active', 'trialing'])
-                    ->first();
+                $site = Site::whereHas('tenant', function ($query) {
+                    $query->whereIn('subscription_status', ['active', 'trialing']);
+                })->with('tenant')->first();
+
+                if ($site) {
+                    $tenant = $site->tenant;
+                }
             }
         }
 
-        if (!$tenant) {
+        if (!$site || !$tenant) {
             return $next($request);
         }
 
@@ -54,12 +64,16 @@ class TenantMiddleware
             abort(403, 'This site is currently unavailable. Please check your subscription.');
         }
 
-        // Share tenant with all views and bind to container
+        // Share site and tenant with all views and bind to container
+        app()->instance('site', $site);
         app()->instance('tenant', $tenant);
         app()->instance('currentTenant', $tenant);
+        app()->instance('currentSite', $site);
+        view()->share('site', $site);
         view()->share('tenant', $tenant);
 
-        // Set tenant in request for easy access
+        // Set tenant and site in request for easy access
+        $request->attributes->set('site', $site);
         $request->attributes->set('tenant', $tenant);
 
         // If user is authenticated, set the current tenant context
