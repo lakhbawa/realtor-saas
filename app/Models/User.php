@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -25,12 +26,7 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
-        'subdomain',
         'is_admin',
-        'stripe_customer_id',
-        'stripe_subscription_id',
-        'subscription_status',
-        'trial_ends_at',
     ];
 
     /**
@@ -54,7 +50,6 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
-            'trial_ends_at' => 'datetime',
         ];
     }
 
@@ -65,25 +60,36 @@ class User extends Authenticatable implements FilamentUser
     {
         if ($panel->getId() === 'admin') {
             // Super admins always have access
-            if ($this->is_admin) {
-                return true;
-            }
-
-            // Tenant users with active subscription can access admin panel
-            // They will see only tenant-relevant resources
-            return $this->hasValidSubscription();
+            return $this->is_admin;
         }
 
-        // Tenant panel - check subscription status
-        return $this->hasValidSubscription();
+        // Tenant panel - check if user belongs to at least one tenant with valid subscription
+        return $this->tenants()->exists() && $this->hasValidSubscriptionInAnyTenant();
     }
 
     /**
-     * Check if user has a valid subscription (active, trialing, or past_due).
+     * Check if user has a valid subscription in any of their tenants.
+     */
+    public function hasValidSubscriptionInAnyTenant(): bool
+    {
+        return $this->tenants()
+            ->whereIn('subscription_status', ['active', 'trialing', 'past_due'])
+            ->exists();
+    }
+
+    /**
+     * Check if user has a valid subscription (for backwards compatibility).
+     * Uses the current tenant context if available.
      */
     public function hasValidSubscription(): bool
     {
-        return in_array($this->subscription_status, ['active', 'trialing', 'past_due']);
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->hasValidSubscription();
+        }
+
+        return $this->hasValidSubscriptionInAnyTenant();
     }
 
     /**
@@ -103,7 +109,98 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Get the site for the user.
+     * Get all tenants the user belongs to.
+     */
+    public function tenants(): BelongsToMany
+    {
+        return $this->belongsToMany(Tenant::class, 'tenant_user')
+            ->withPivot('role')
+            ->withTimestamps()
+            ->using(TenantUser::class);
+    }
+
+    /**
+     * Get the current tenant from context.
+     */
+    public function currentTenant(): ?Tenant
+    {
+        return app('currentTenant');
+    }
+
+    /**
+     * Set the current tenant context.
+     */
+    public function setCurrentTenant(?Tenant $tenant): void
+    {
+        app()->instance('currentTenant', $tenant);
+    }
+
+    /**
+     * Get tenants where user is an owner.
+     */
+    public function ownedTenants(): BelongsToMany
+    {
+        return $this->tenants()->wherePivot('role', TenantUser::ROLE_OWNER);
+    }
+
+    /**
+     * Check if user is a member of a specific tenant.
+     */
+    public function belongsToTenant(Tenant $tenant): bool
+    {
+        return $this->tenants()->where('tenant_id', $tenant->id)->exists();
+    }
+
+    /**
+     * Get user's role in a specific tenant.
+     */
+    public function roleInTenant(Tenant $tenant): ?string
+    {
+        $pivot = $this->tenants()->where('tenant_id', $tenant->id)->first()?->pivot;
+        return $pivot?->role;
+    }
+
+    /**
+     * Check if user has a specific role in a tenant.
+     */
+    public function hasRoleInTenant(Tenant $tenant, string $role): bool
+    {
+        return $this->roleInTenant($tenant) === $role;
+    }
+
+    /**
+     * Check if user can manage a specific tenant.
+     */
+    public function canManageTenant(Tenant $tenant): bool
+    {
+        if ($this->is_admin) {
+            return true;
+        }
+
+        $role = $this->roleInTenant($tenant);
+        return in_array($role, [TenantUser::ROLE_OWNER, TenantUser::ROLE_ADMIN]);
+    }
+
+    /**
+     * Check if user can edit content in a specific tenant.
+     */
+    public function canEditInTenant(Tenant $tenant): bool
+    {
+        if ($this->is_admin) {
+            return true;
+        }
+
+        $role = $this->roleInTenant($tenant);
+        return in_array($role, [
+            TenantUser::ROLE_OWNER,
+            TenantUser::ROLE_ADMIN,
+            TenantUser::ROLE_EDITOR,
+        ]);
+    }
+
+    /**
+     * Get the site for the user (deprecated - use tenant->site instead).
+     * @deprecated Use currentTenant()->site instead
      */
     public function site(): HasOne
     {
@@ -111,7 +208,8 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Get the subscription for the user.
+     * Get the subscription for the user (deprecated - use tenant->subscription instead).
+     * @deprecated Use currentTenant()->subscription instead
      */
     public function subscription(): HasOne
     {
@@ -119,23 +217,26 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Get all properties for the user.
+     * Get all properties for the user (deprecated - use tenant->properties instead).
+     * @deprecated Use currentTenant()->properties instead
      */
     public function properties(): HasMany
     {
-        return $this->hasMany(Property::class);
+        return $this->hasMany(Property::class, 'created_by');
     }
 
     /**
-     * Get all testimonials for the user.
+     * Get all testimonials for the user (deprecated - use tenant->testimonials instead).
+     * @deprecated Use currentTenant()->testimonials instead
      */
     public function testimonials(): HasMany
     {
-        return $this->hasMany(Testimonial::class);
+        return $this->hasMany(Testimonial::class, 'created_by');
     }
 
     /**
-     * Get all contact submissions for the user.
+     * Get all contact submissions for the user (deprecated).
+     * @deprecated Use currentTenant()->contactSubmissions instead
      */
     public function contactSubmissions(): HasMany
     {
@@ -143,64 +244,109 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Get all pages for the user.
+     * Get all pages for the user (deprecated - use tenant->pages instead).
+     * @deprecated Use currentTenant()->pages instead
      */
     public function pages(): HasMany
     {
-        return $this->hasMany(Page::class);
+        return $this->hasMany(Page::class, 'created_by');
     }
 
     /**
-     * Get all blog posts for the user.
+     * Get all blog posts for the user (deprecated - use tenant->blogPosts instead).
+     * @deprecated Use currentTenant()->blogPosts instead
      */
     public function blogPosts(): HasMany
     {
-        return $this->hasMany(BlogPost::class);
+        return $this->hasMany(BlogPost::class, 'created_by');
     }
 
     /**
      * Check if user has an active subscription.
+     * Uses current tenant context if available.
      */
     public function hasActiveSubscription(): bool
     {
-        return $this->subscription_status === 'active';
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->hasActiveSubscription();
+        }
+
+        return $this->tenants()
+            ->where('subscription_status', 'active')
+            ->exists();
     }
 
     /**
      * Check if user's subscription is past due.
+     * Uses current tenant context if available.
      */
     public function isPastDue(): bool
     {
-        return $this->subscription_status === 'past_due';
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->subscription_status === 'past_due';
+        }
+
+        return false;
     }
 
     /**
      * Check if user is on trial.
+     * Uses current tenant context if available.
      */
     public function onTrial(): bool
     {
-        return $this->trial_ends_at && $this->trial_ends_at->isFuture();
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->onTrial();
+        }
+
+        return false;
     }
 
     /**
      * Get the public URL for the tenant's site.
+     * Uses current tenant context if available.
      */
     public function getPublicUrlAttribute(): string
     {
-        $domain = config('app.domain', 'myrealtorsites.local');
-        return "http://{$this->subdomain}.{$domain}";
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->url();
+        }
+
+        // Fallback for backwards compatibility
+        $firstTenant = $this->tenants()->first();
+        return $firstTenant ? $firstTenant->url() : '';
     }
 
     /**
      * Get a plan limit value.
+     * Uses current tenant context if available.
      */
     public function getPlanLimit(string $key, mixed $default = null): mixed
     {
-        return $this->subscription?->getLimit($key, $default) ?? $default;
+        if ($this->is_admin) {
+            return -1; // Unlimited for admins
+        }
+
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->getPlanLimit($key, $default);
+        }
+
+        return $default;
     }
 
     /**
      * Check if user's plan has a specific feature.
+     * Uses current tenant context if available.
      */
     public function hasPlanFeature(string $key): bool
     {
@@ -208,11 +354,18 @@ class User extends Authenticatable implements FilamentUser
             return true;
         }
 
-        return $this->subscription?->hasFeature($key) ?? false;
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->hasAccessToFeature($key);
+        }
+
+        return false;
     }
 
     /**
      * Check if user can create more of a resource.
+     * Uses current tenant context if available.
      */
     public function canCreateMore(string $limitKey, string $relation): bool
     {
@@ -220,40 +373,50 @@ class User extends Authenticatable implements FilamentUser
             return true;
         }
 
-        $limit = $this->getPlanLimit($limitKey);
+        $currentTenant = $this->currentTenant();
 
-        // null or -1 means unlimited
-        if ($limit === null || $limit === -1) {
-            return true;
+        if ($currentTenant) {
+            // Convert limitKey like 'max_properties' to resource type 'properties'
+            $resourceType = str_replace('max_', '', $limitKey);
+            return $currentTenant->canCreateMore($resourceType);
         }
 
-        return $this->$relation()->count() < $limit;
+        return false;
     }
 
     /**
      * Get remaining quota for a resource.
+     * Uses current tenant context if available.
      */
-    public function getRemainingQuota(string $limitKey, string $relation): ?int
+    public function getRemainingQuota(string $limitKey, string $relation): int|string|null
     {
         if ($this->is_admin) {
-            return null; // unlimited
+            return 'unlimited';
         }
 
-        $limit = $this->getPlanLimit($limitKey);
+        $currentTenant = $this->currentTenant();
 
-        // null or -1 means unlimited
-        if ($limit === null || $limit === -1) {
-            return null;
+        if ($currentTenant) {
+            // Convert limitKey like 'max_properties' to resource type 'properties'
+            $resourceType = str_replace('max_', '', $limitKey);
+            return $currentTenant->getRemainingQuota($resourceType);
         }
 
-        return max(0, $limit - $this->$relation()->count());
+        return 0;
     }
 
     /**
      * Get the current plan.
+     * Uses current tenant context if available.
      */
     public function getCurrentPlan(): ?\App\Models\Plan
     {
-        return $this->subscription?->plan;
+        $currentTenant = $this->currentTenant();
+
+        if ($currentTenant) {
+            return $currentTenant->subscription?->plan;
+        }
+
+        return null;
     }
 }

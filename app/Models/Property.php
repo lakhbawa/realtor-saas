@@ -16,7 +16,9 @@ class Property extends Model
      * @var array<string>
      */
     protected $fillable = [
-        'user_id',
+        'tenant_id',
+        'created_by',
+        'updated_by',
         'title',
         'slug',
         'description',
@@ -64,17 +66,27 @@ class Property extends Model
     {
         parent::boot();
 
-        // Auto-scope to authenticated user (tenant context)
+        // Auto-scope to current tenant context
         static::addGlobalScope('tenant', function (Builder $builder) {
             if (auth()->check() && !auth()->user()->is_admin) {
-                $builder->where('user_id', auth()->id());
+                $currentTenant = auth()->user()->currentTenant();
+                if ($currentTenant) {
+                    $builder->where('tenant_id', $currentTenant->id);
+                }
             }
         });
 
-        // Auto-set user_id on create
+        // Auto-set tenant_id and created_by on create
         static::creating(function ($property) {
-            if (!$property->user_id && auth()->check()) {
-                $property->user_id = auth()->id();
+            if (!$property->tenant_id && auth()->check()) {
+                $currentTenant = auth()->user()->currentTenant();
+                if ($currentTenant) {
+                    $property->tenant_id = $currentTenant->id;
+                }
+            }
+
+            if (!$property->created_by && auth()->check()) {
+                $property->created_by = auth()->id();
             }
 
             // Auto-generate slug if not provided
@@ -82,14 +94,46 @@ class Property extends Model
                 $property->slug = Str::slug($property->title);
             }
         });
+
+        // Auto-set updated_by on update
+        static::updating(function ($property) {
+            if (auth()->check()) {
+                $property->updated_by = auth()->id();
+            }
+        });
     }
 
     /**
-     * Get the user that owns the property.
+     * Get the tenant that owns the property.
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Get the user that created the property.
+     */
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Get the user that last updated the property.
+     */
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Get the user that owns the property (deprecated).
+     * @deprecated Use tenant() instead
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**

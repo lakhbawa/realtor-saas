@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\User;
+use App\Models\Tenant;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,7 +11,7 @@ class TenantMiddleware
 {
     /**
      * Handle an incoming request.
-     * Resolves the tenant (user) from the subdomain and makes it available.
+     * Resolves the tenant from the subdomain and makes it available.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -32,16 +32,15 @@ class TenantMiddleware
             }
 
             // Find the tenant by subdomain
-            $tenant = User::where('subdomain', $subdomain)->first();
+            $tenant = Tenant::where('subdomain', $subdomain)->first();
 
             if (!$tenant) {
                 abort(404, 'Site not found');
             }
         } else {
-            // For development/testing: use first non-admin tenant or query param
+            // For development/testing: use first tenant with valid subscription
             if ($this->isLocalDevelopment($host)) {
-                $tenant = User::where('is_admin', false)
-                    ->whereIn('subscription_status', ['active', 'trialing'])
+                $tenant = Tenant::whereIn('subscription_status', ['active', 'trialing'])
                     ->first();
             }
         }
@@ -50,17 +49,23 @@ class TenantMiddleware
             return $next($request);
         }
 
-        // Check if tenant has active subscription
-        if (!$tenant->hasActiveSubscription()) {
-            abort(403, 'This site is currently unavailable');
+        // Check if tenant has valid subscription
+        if (!$tenant->hasValidSubscription()) {
+            abort(403, 'This site is currently unavailable. Please check your subscription.');
         }
 
         // Share tenant with all views and bind to container
         app()->instance('tenant', $tenant);
+        app()->instance('currentTenant', $tenant);
         view()->share('tenant', $tenant);
 
         // Set tenant in request for easy access
         $request->attributes->set('tenant', $tenant);
+
+        // If user is authenticated, set the current tenant context
+        if (auth()->check()) {
+            auth()->user()->setCurrentTenant($tenant);
+        }
 
         return $next($request);
     }

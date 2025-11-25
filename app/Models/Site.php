@@ -13,7 +13,8 @@ class Site extends Model
      * @var array<string>
      */
     protected $fillable = [
-        'user_id',
+        'tenant_id',
+        'updated_by',
         'template_id',
         'site_name',
         'tagline',
@@ -70,11 +71,28 @@ class Site extends Model
     }
 
     /**
-     * Get the user that owns the site.
+     * Get the tenant that owns the site.
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Get the user that last updated the site (deprecated).
+     * @deprecated Use updatedBy() instead
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Get the user that last updated the site.
+     */
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**

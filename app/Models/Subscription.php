@@ -13,7 +13,7 @@ class Subscription extends Model
      * @var array<string>
      */
     protected $fillable = [
-        'user_id',
+        'tenant_id',
         'plan_id',
         'stripe_subscription_id',
         'stripe_price_id',
@@ -67,11 +67,20 @@ class Subscription extends Model
     ];
 
     /**
-     * Get the user that owns the subscription.
+     * Get the tenant that owns the subscription.
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Get the user that owns the subscription (deprecated).
+     * @deprecated Use tenant() instead
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'tenant_id');
     }
 
     /**
