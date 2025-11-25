@@ -25,6 +25,7 @@ services:
       - db
       - redis
     image: lakhveerbawa/phpdock:php841
+    container_name: realtor-app
     command:
       - php-fpm
     expose:
@@ -33,16 +34,18 @@ services:
     restart: unless-stopped
     tty: true
     environment:
-      SERVICE_NAME: app
-      SERVICE_TAGS: dev
+      - APP_ENV=production
+      - TRAEFIK_SYNC_ENABLED=true
+      - TRAEFIK_CONFIG_PATH=/traefik-config/realtor.yml
+      - TRAEFIK_SERVICE_NAME=realtor
+      - TRAEFIK_BACKEND_URL=http://realtor-nginx:80
     working_dir: /var/www
-    labels:
-      - "traefik.enable=false"
+
     volumes:
       - ./:/var/www
       - ./docker/config/php/production.ini:/usr/local/etc/php/conf.d/local.ini
       # Mount traefik dynamic config directory for write access (traefik:sync command)
-      - ./traefik/dynamic:/traefik/dynamic
+      - /www/traefik_dynamic:/traefik-config/realtor.yml
     networks:
       - app-network
     #Nginx Service
@@ -50,6 +53,7 @@ services:
 
   nginx:
     image: nginx:alpine
+    container_name: realtor-nginx
     restart: unless-stopped
     tty: true
     volumes:
