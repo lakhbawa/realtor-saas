@@ -116,6 +116,7 @@ class SyncTraefikConfig extends Command
         // Add wildcard subdomain (matches any subdomain)
         $hostRules[] = "HostRegexp(`{subdomain:[a-z0-9-]+}.{$this->extractBaseDomain($wildcardDomain)}`)";
 
+        $hostRules[] = "Host(`{$this->extractBaseDomain($wildcardDomain)}`)";
         // Add custom domains (exact match)
         foreach ($customDomains as $domain) {
             $hostRules[] = "Host(`{$domain}`)";
