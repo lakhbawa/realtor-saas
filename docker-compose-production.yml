@@ -16,7 +16,6 @@ services:
     restart: unless-stopped
     tty: true
     environment:
-      - APP_ENV=production
       - TRAEFIK_SYNC_ENABLED=true
       - TRAEFIK_CONFIG_PATH=/traefik-config/realtor.yml
       - TRAEFIK_SERVICE_NAME=realtor
