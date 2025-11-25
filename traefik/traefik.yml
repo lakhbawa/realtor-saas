@@ -1,0 +1,75 @@
+# Traefik Static Configuration
+# This file defines the core Traefik settings
+# Dynamic routing rules are in traefik/dynamic/realtor-saas.yml
+
+# API and Dashboard (optional - comment out in production for security)
+# api:
+#   dashboard: true
+#   insecure: true  # Enables dashboard on :8080 without auth
+
+# Entry Points
+entryPoints:
+  # HTTP Entry Point (Port 80)
+  web:
+    address: ":80"
+    # Uncomment to force HTTPS redirect globally
+    # http:
+    #   redirections:
+    #     entryPoint:
+    #       to: websecure
+    #       scheme: https
+    #       permanent: true
+
+  # HTTPS Entry Point (Port 443)
+  websecure:
+    address: ":443"
+
+# Certificate Resolvers
+certificateResolvers:
+  # Let's Encrypt Certificate Resolver
+  letsencrypt:
+    acme:
+      # Email for Let's Encrypt notifications
+      email: admin@myrealtorsites.com  # CHANGE THIS TO YOUR EMAIL
+
+      # Certificate storage file
+      storage: /letsencrypt/acme.json
+
+      # Use staging server for testing (remove for production)
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+
+      # HTTP Challenge (recommended for most cases)
+      httpChallenge:
+        entryPoint: web
+
+      # TLS Challenge (alternative - requires port 443)
+      # tlsChallenge: {}
+
+      # DNS Challenge (for wildcard certificates - requires DNS provider)
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   delayBeforeCheck: 30
+
+# Providers
+providers:
+  # Docker Provider (for container-based routing)
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false  # Only containers with traefik.enable=true
+    network: web             # Default network to use
+    watch: true              # Watch for container changes
+
+  # File Provider (for dynamic configuration)
+  file:
+    directory: /traefik/dynamic
+    watch: true  # Watch for file changes and auto-reload
+
+# Logging
+log:
+  level: INFO  # DEBUG, INFO, WARN, ERROR
+  # filePath: /var/log/traefik/traefik.log
+
+# Access Logs (optional - can be verbose)
+# accessLog:
+#   filePath: /var/log/traefik/access.log
+#   bufferingSize: 100
