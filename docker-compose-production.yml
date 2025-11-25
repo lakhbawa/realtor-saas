@@ -53,7 +53,7 @@ services:
     environment:
       POSTGRES_USER: lakhbawa
       POSTGRES_PASSWORD: "${DB_PASSWORD:-Sartaj@jaan855}"
-      POSTGRES_DB: elevatecore
+      POSTGRES_DB: realtor_saas
     volumes:
       - dbdata:/var/lib/postgresql/data
     ports:
