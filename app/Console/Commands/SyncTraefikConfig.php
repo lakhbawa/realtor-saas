@@ -132,7 +132,7 @@ class SyncTraefikConfig extends Command
                         'service' => $serviceName,
                         'entryPoints' => ['websecure'],
                         'tls' => [
-                            'certResolver' => 'letsencrypt',
+                            'certResolver' => 'lets-encrypt',
                         ],
                     ],
                     "{$serviceName}-http" => [
