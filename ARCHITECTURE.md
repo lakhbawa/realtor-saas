@@ -102,11 +102,13 @@ All content tables now reference `tenant_id` instead of `user_id`:
 |--------|------|-------------|
 | `tenant_id` | foreignId (indexed) | References tenants.id |
 | `subdomain` | string (unique) | Subdomain identifier |
+| `custom_domain` | string (unique, nullable) | Custom domain (e.g., www.johndoe.com) |
+| `custom_domain_verified` | boolean | Whether custom domain is verified |
 | `updated_by` | foreignId | Last user who updated |
 | `template_id` | foreignId | Template used |
 | ... | | Site configuration fields |
 
-**Note:** One tenant can have multiple sites. Each site has its own unique subdomain.
+**Note:** One tenant can have multiple sites. Each site has its own unique subdomain and can optionally have a verified custom domain.
 
 #### `properties`
 | Column | Type | Description |
@@ -225,28 +227,42 @@ $tenantUser->canManage() // Check if can manage settings
 
 ### How It Works
 
-1. **Extract Subdomain** from HTTP host header
+1. **Try Custom Domain First** (exact match on host)
+   ```php
+   $site = Site::where('custom_domain', $host)
+       ->where('custom_domain_verified', true)
+       ->with('tenant')
+       ->first();
+   ```
+   ```
+   Request: https://www.johndoe.com
+   Matches: custom_domain = 'www.johndoe.com'
+   ```
+
+2. **Fallback to Subdomain** if no custom domain match
    ```
    Request: https://johndoe.myrealtorsites.com
    Subdomain: johndoe
    ```
-
-2. **Find Site** by subdomain (and eager load tenant)
    ```php
    $site = Site::where('subdomain', 'johndoe')
        ->with('tenant')
        ->first();
+   ```
+
+3. **Get Tenant** from site
+   ```php
    $tenant = $site->tenant;
    ```
 
-3. **Validate Subscription** status
+4. **Validate Subscription** status
    ```php
    if (!$tenant->hasValidSubscription()) {
        abort(403, 'Site unavailable');
    }
    ```
 
-4. **Bind to Container** for global access
+5. **Bind to Container** for global access
    ```php
    app()->instance('site', $site);
    app()->instance('tenant', $tenant);
@@ -254,7 +270,7 @@ $tenantUser->canManage() // Check if can manage settings
    app()->instance('currentSite', $site);
    ```
 
-5. **Set User Context** if authenticated
+6. **Set User Context** if authenticated
    ```php
    auth()->user()->setCurrentTenant($tenant);
    ```
@@ -457,7 +473,7 @@ php artisan migrate
 ### Site Methods
 
 ```php
-// Site instance - resolved by subdomain
+// Site instance - resolved by subdomain or custom domain
 $site = Site::where('subdomain', 'johndoe')->first();
 
 // Relationships
@@ -465,12 +481,21 @@ $site->tenant()      // Tenant that owns this site
 $site->updatedBy()   // User who last updated
 $site->template()    // Template used
 
-// URL
-$site->url()  // https://johndoe.myrealtorsites.com
+// URL Methods
+$site->url()                 // Returns custom domain if verified, otherwise subdomain URL
+                             // https://www.johndoe.com OR https://johndoe.myrealtorsites.com
+$site->subdomainUrl()        // Always returns subdomain URL
+                             // https://johndoe.myrealtorsites.com
+$site->customDomainUrl()     // Returns custom domain URL or null
+                             // https://www.johndoe.com OR null
+
+// Custom Domain Checks
+$site->hasCustomDomain()                  // bool - true if custom domain is set AND verified
+$site->customDomainPendingVerification()  // bool - true if custom domain set but not verified
 
 // Configuration
-$site->isSetupComplete()        // bool
-$site->getSetupProgressAttribute()  // int (0-100)
+$site->isSetupComplete()             // bool
+$site->getSetupProgressAttribute()   // int (0-100)
 ```
 
 ### Tenant Methods
@@ -642,27 +667,72 @@ $this->assertNull(Property::find($property->id)); // Scoped out
 
 ---
 
+## Custom Domain Support
+
+✅ **Implemented** - Sites can use custom domains in addition to subdomains.
+
+### Features
+
+- Each site can have one custom domain (e.g., www.johndoe.com)
+- Custom domains must be verified before use
+- URL resolution prioritizes custom domain over subdomain
+- Subdomain remains as fallback if custom domain is removed
+
+### Implementation
+
+**Database Fields (sites table):**
+- `custom_domain` - Stores the custom domain (unique, nullable)
+- `custom_domain_verified` - Boolean flag for verification status
+
+**DNS Setup Required:**
+Tenants need to add a CNAME record pointing to their subdomain:
+```
+CNAME: www.johndoe.com → johndoe.myrealtorsites.com
+```
+
+**Verification Workflow:**
+1. Tenant enters custom domain in dashboard
+2. System sets `custom_domain` but `custom_domain_verified = false`
+3. Tenant configures DNS CNAME record
+4. System verifies DNS propagation (manual or automated)
+5. System sets `custom_domain_verified = true`
+6. Site becomes accessible via custom domain
+
+**Future Enhancement:**
+If multiple domains per site are needed, migrate to separate `domains` table with many-to-one relationship to sites.
+
+---
+
 ## Future Enhancements
 
-1. **Multi-Site Per Tenant**
-   - Allow one tenant to manage multiple sites/subdomains
+1. **Multi-Site Per Tenant** ✅ **Completed**
+   - One tenant can now manage multiple sites/subdomains
    - Useful for agencies managing client sites
 
-2. **Custom Domains**
-   - Allow tenants to use custom domains
-   - Requires DNS CNAME setup
+2. **Multiple Custom Domains Per Site**
+   - Currently limited to one custom domain per site
+   - Could migrate to `domains` table for unlimited domains
+   - Requires: domains table with site_id foreign key
 
-3. **Team Invitations**
+3. **Automated Custom Domain Verification**
+   - Automatically verify DNS CNAME records
+   - Use DNS lookup APIs to check propagation
+   - Email notifications when verification succeeds/fails
+
+4. **Team Invitations**
    - Email invites with role assignment
    - Accept/decline flow
+   - Invitation expiration
 
-4. **Audit Logging**
+5. **Audit Logging**
    - Track who created/updated what
    - Use `created_by` and `updated_by` fields
+   - Activity timeline in dashboard
 
-5. **Role Permissions**
+6. **Role Permissions**
    - Fine-grained permissions per role
    - Permission matrix in database
+   - Customizable permissions per tenant
 
 ---
 
