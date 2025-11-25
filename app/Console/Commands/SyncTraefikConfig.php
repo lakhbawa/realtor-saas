@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Site;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Symfony\Component\Yaml\Yaml;
 
 class SyncTraefikConfig extends Command
 {
@@ -164,7 +165,7 @@ class SyncTraefikConfig extends Command
             ],
         ];
 
-        return $this->arrayToYaml($config);
+        return Yaml::dump($config, 10, 2);
     }
 
     /**
@@ -175,46 +176,6 @@ class SyncTraefikConfig extends Command
         return str_replace('*.', '', $wildcardDomain);
     }
 
-    /**
- * Convert array to YAML format.
- */
-    protected function arrayToYaml(array $array, int $indent = 0): string
-    {
-        $yaml = '';
-        $prefix = str_repeat('  ', $indent);
-
-        foreach ($array as $key => $value) {
-            if (is_array($value)) {
-                // Check if it's a sequential array (list)
-                if (array_keys($value) === range(0, count($value) - 1)) {
-                    $yaml .= "{$prefix}{$key}:\n";
-                    foreach ($value as $item) {
-                        if (is_array($item)) {
-                            $yaml .= "{$prefix}  -\n";
-                            $yaml .= $this->arrayToYaml($item, $indent + 2);
-                        } else {
-                            $yaml .= "{$prefix}  - {$item}\n";
-                        }
-                    }
-                } else {
-                    $yaml .= "{$prefix}{$key}:\n";
-                    $yaml .= $this->arrayToYaml($value, $indent + 1);
-                }
-            } elseif (is_bool($value)) {
-                $yaml .= "{$prefix}{$key}: " . ($value ? 'true' : 'false') . "\n";
-            } elseif (is_null($value)) {
-                $yaml .= "{$prefix}{$key}: null\n";
-            } else {
-                // Quote strings that contain special YAML characters
-                if (is_string($value) && preg_match('/[:\[\]{}|>@`]/', $value)) {
-                    $value = '"' . addslashes($value) . '"';
-                }
-                $yaml .= "{$prefix}{$key}: {$value}\n";
-            }
-        }
-
-        return $yaml;
-    }
 
     /**
      * Get the path where Traefik config should be written.
