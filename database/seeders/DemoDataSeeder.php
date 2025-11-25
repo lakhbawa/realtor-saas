@@ -40,6 +40,7 @@ class DemoDataSeeder extends Seeder
             ['name' => 'John Smith Realty'],
             [
                 'subscription_status' => 'active',
+                'trial_ends_at' => null,
             ]
         );
 
@@ -78,6 +79,8 @@ class DemoDataSeeder extends Seeder
                 'facebook' => 'https://facebook.com/johnsmithrealty',
                 'instagram' => 'https://instagram.com/johnsmithrealty',
                 'linkedin' => 'https://linkedin.com/in/johnsmithrealty',
+                'custom_domain' => 'johnsmithrealty.com',
+                'custom_domain_verified' => true,
                 'meta_title' => 'John Smith Realty - Beverly Hills Real Estate Agent',
                 'meta_description' => 'Find your dream home in Beverly Hills with John Smith Realty. Over 15 years of experience helping families find their perfect homes.',
                 'is_published' => true,
