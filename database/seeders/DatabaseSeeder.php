@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             PlanSeeder::class,
             TemplateSeeder::class,
             DemoDataSeeder::class,
+            TenantsSeeder::class,
         ]);
     }
 }
