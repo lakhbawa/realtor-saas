@@ -116,7 +116,9 @@ class SyncTraefikConfig extends Command
         // Add wildcard subdomain (matches any subdomain)
         $hostRules[] = "HostRegexp(`{subdomain:[a-z0-9-]+}.{$this->extractBaseDomain($wildcardDomain)}`)";
 
+        // Add base domain
         $hostRules[] = "Host(`{$this->extractBaseDomain($wildcardDomain)}`)";
+
         // Add custom domains (exact match)
         foreach ($customDomains as $domain) {
             $hostRules[] = "Host(`{$domain}`)";
@@ -174,8 +176,8 @@ class SyncTraefikConfig extends Command
     }
 
     /**
-     * Convert array to YAML format.
-     */
+ * Convert array to YAML format.
+ */
     protected function arrayToYaml(array $array, int $indent = 0): string
     {
         $yaml = '';
@@ -203,6 +205,10 @@ class SyncTraefikConfig extends Command
             } elseif (is_null($value)) {
                 $yaml .= "{$prefix}{$key}: null\n";
             } else {
+                // Quote strings that contain special YAML characters
+                if (is_string($value) && preg_match('/[:\[\]{}|>@`]/', $value)) {
+                    $value = '"' . addslashes($value) . '"';
+                }
                 $yaml .= "{$prefix}{$key}: {$value}\n";
             }
         }
