@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Models\Tenant;
+use App\Models\Site;
 use App\Models\Property;
 use App\Models\Testimonial;
 use App\Models\ContactSubmission;
@@ -15,15 +16,12 @@ use Illuminate\View\View;
 
 class PublicSiteController extends Controller
 {
-    protected User $tenant;
-    protected string $template;
-
     public function __construct()
     {
-        // Tenant is resolved by middleware
+        // Tenant and site are resolved by middleware
     }
 
-    protected function getTenant(): User
+    protected function getTenant(): Tenant
     {
         $tenant = app()->bound('tenant') ? app('tenant') : null;
 
@@ -34,9 +32,20 @@ class PublicSiteController extends Controller
         return $tenant;
     }
 
+    protected function getSite(): Site
+    {
+        $site = app()->bound('site') ? app('site') : null;
+
+        if (!$site) {
+            abort(404, 'Site not found.');
+        }
+
+        return $site;
+    }
+
     protected function getTemplateName(): string
     {
-        $site = $this->getTenant()->site;
+        $site = $this->getSite();
         $template = $site?->template;
 
         return $template?->slug ?? 'modern';
@@ -45,18 +54,19 @@ class PublicSiteController extends Controller
     protected function view(string $view, array $data = []): View
     {
         $tenant = $this->getTenant();
+        $site = $this->getSite();
         $template = $this->getTemplateName();
 
         // Get published pages for navigation
         $navPages = Page::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->orderBy('sort_order')
             ->get();
 
         $baseData = [
             'tenant' => $tenant,
-            'site' => $tenant->site,
+            'site' => $site,
             'template' => $template,
             'navPages' => $navPages,
         ];
@@ -70,7 +80,7 @@ class PublicSiteController extends Controller
 
         $featuredProperties = Property::withoutGlobalScopes()
             ->with('images')
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('status', 'active')
             ->where('is_featured', true)
             ->latest()
@@ -79,14 +89,14 @@ class PublicSiteController extends Controller
 
         $testimonials = Testimonial::withoutGlobalScopes()
             ->with('property')
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->ordered()
             ->take(3)
             ->get();
 
         $recentPosts = BlogPost::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
@@ -106,7 +116,7 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
 
         $query = Property::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('status', 'active');
 
         // Filters
@@ -153,7 +163,7 @@ class PublicSiteController extends Controller
 
         $property = Property::withoutGlobalScopes()
             ->with('images')
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('slug', $slug)
             ->where('status', 'active')
             ->firstOrFail();
@@ -161,7 +171,7 @@ class PublicSiteController extends Controller
         // Get related properties by similar price range or location
         $relatedProperties = Property::withoutGlobalScopes()
             ->with('images')
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('id', '!=', $property->id)
             ->where('status', 'active')
             ->where(function ($query) use ($property) {
@@ -186,7 +196,7 @@ class PublicSiteController extends Controller
 
         $testimonials = Testimonial::withoutGlobalScopes()
             ->with('property')
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->ordered()
             ->take(6)
@@ -204,7 +214,7 @@ class PublicSiteController extends Controller
         // Get featured testimonials first
         $featuredTestimonials = Testimonial::withoutGlobalScopes()
             ->with('property')
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->where('is_featured', true)
             ->ordered()
@@ -213,7 +223,7 @@ class PublicSiteController extends Controller
         // Get all other testimonials
         $testimonials = Testimonial::withoutGlobalScopes()
             ->with('property')
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->where('is_featured', false)
             ->ordered()
@@ -221,12 +231,12 @@ class PublicSiteController extends Controller
 
         // Calculate stats
         $totalTestimonials = Testimonial::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->count();
 
         $averageRating = Testimonial::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->avg('rating');
 
@@ -246,6 +256,7 @@ class PublicSiteController extends Controller
     public function submitContact(Request $request)
     {
         $tenant = $this->getTenant();
+        $site = $this->getSite();
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -256,7 +267,7 @@ class PublicSiteController extends Controller
         ]);
 
         $submission = ContactSubmission::create([
-            'user_id' => $tenant->id,
+            'tenant_id' => $tenant->id,
             'property_id' => $validated['property_id'] ?? null,
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -265,7 +276,7 @@ class PublicSiteController extends Controller
         ]);
 
         // Send email notification
-        $notifyEmail = $tenant->site?->email ?? $tenant->email;
+        $notifyEmail = $site->email ?? config('mail.from.address');
         Mail::to($notifyEmail)->queue(new ContactFormSubmitted($submission));
 
         return back()->with('success', 'Thank you for your message! We will get back to you soon.');
@@ -277,7 +288,7 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
 
         $query = BlogPost::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
@@ -303,7 +314,7 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
 
         $post = BlogPost::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('slug', $slug)
             ->where('is_published', true)
             ->whereNotNull('published_at')
@@ -311,7 +322,7 @@ class PublicSiteController extends Controller
             ->firstOrFail();
 
         $recentPosts = BlogPost::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('id', '!=', $post->id)
             ->where('is_published', true)
             ->whereNotNull('published_at')
@@ -332,7 +343,7 @@ class PublicSiteController extends Controller
         $tenant = $this->getTenant();
 
         $page = Page::withoutGlobalScopes()
-            ->where('user_id', $tenant->id)
+            ->where('tenant_id', $tenant->id)
             ->where('slug', $slug)
             ->where('is_published', true)
             ->firstOrFail();
