@@ -15,13 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('role', 50)->default('member'); // owner, admin, editor, member, viewer
+            $table->string('role', 50)->default('member');
             $table->timestamps();
 
-            // Ensure a user can only have one role per tenant
             $table->unique(['tenant_id', 'user_id']);
-
-            // Indexes for performance
             $table->index('tenant_id');
             $table->index('user_id');
             $table->index('role');

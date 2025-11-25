@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Tenant;
 use App\Models\Site;
 use App\Models\Template;
 use App\Models\Property;
@@ -15,38 +16,47 @@ class DemoDataSeeder extends Seeder
     public function run(): void
     {
         // Create admin user
-        // Note: password is auto-hashed by User model's 'hashed' cast
         $admin = User::updateOrCreate(
             ['email' => 'admin@example.com'],
             [
                 'name' => 'Admin User',
-                'subdomain' => 'admin-user',
                 'password' => 'password',
                 'is_admin' => true,
+            ]
+        );
+
+        // Create demo user
+        $demoUser = User::updateOrCreate(
+            ['email' => 'demo@example.com'],
+            [
+                'name' => 'John Smith',
+                'password' => 'password',
+                'is_admin' => false,
+            ]
+        );
+
+        // Create demo tenant
+        $tenant = Tenant::updateOrCreate(
+            ['name' => 'John Smith Realty'],
+            [
                 'subscription_status' => 'active',
             ]
         );
 
-        // Create demo tenant user
-        $tenant = User::updateOrCreate(
-            ['email' => 'demo@example.com'],
-            [
-                'name' => 'John Smith',
-                'subdomain' => 'johnsmith',
-                'password' => 'password',
-                'is_admin' => false,
-                'subscription_status' => 'active',
-            ]
-        );
+        // Attach demo user to tenant as owner
+        $tenant->users()->syncWithoutDetaching([
+            $demoUser->id => ['role' => 'owner']
+        ]);
 
         // Get a template
         $template = Template::where('slug', 'modern')->first();
 
         // Create site for demo tenant
         $site = Site::updateOrCreate(
-            ['user_id' => $tenant->id],
+            ['tenant_id' => $tenant->id, 'subdomain' => 'johnsmith'],
             [
                 'template_id' => $template?->id,
+                'updated_by' => $demoUser->id,
                 'site_name' => 'John Smith Realty',
                 'tagline' => 'Your Dream Home Awaits',
                 'email' => 'john@johnsmithrealty.com',
@@ -56,6 +66,14 @@ class DemoDataSeeder extends Seeder
                 'state' => 'CA',
                 'zip' => '90210',
                 'bio' => 'With over 15 years of experience in the real estate industry, I specialize in helping families find their perfect homes in the Los Angeles area. My commitment to personalized service and deep knowledge of the local market ensures that every client receives the attention they deserve.',
+                'license_number' => 'CA-DRE-01234567',
+                'brokerage' => 'Smith & Associates Real Estate',
+                'years_experience' => 15,
+                'specialties' => 'Luxury Homes, First-Time Buyers, Investment Properties',
+                'stat_properties_sold' => 250,
+                'stat_sales_volume' => 125000000,
+                'stat_happy_clients' => 200,
+                'stat_average_rating' => 4.9,
                 'primary_color' => '#4F46E5',
                 'facebook' => 'https://facebook.com/johnsmithrealty',
                 'instagram' => 'https://instagram.com/johnsmithrealty',
@@ -81,6 +99,7 @@ class DemoDataSeeder extends Seeder
                 'state' => 'CA',
                 'zip' => '90210',
                 'status' => 'active',
+                'listing_status' => 'for_sale',
                 'is_featured' => true,
             ],
             [
@@ -96,6 +115,7 @@ class DemoDataSeeder extends Seeder
                 'state' => 'CA',
                 'zip' => '91101',
                 'status' => 'active',
+                'listing_status' => 'for_sale',
                 'is_featured' => true,
             ],
             [
@@ -111,6 +131,7 @@ class DemoDataSeeder extends Seeder
                 'state' => 'CA',
                 'zip' => '90012',
                 'status' => 'active',
+                'listing_status' => 'for_sale',
                 'is_featured' => true,
             ],
             [
@@ -126,14 +147,19 @@ class DemoDataSeeder extends Seeder
                 'state' => 'CA',
                 'zip' => '90401',
                 'status' => 'active',
+                'listing_status' => 'for_rent',
                 'is_featured' => false,
             ],
         ];
 
         foreach ($properties as $propertyData) {
             Property::updateOrCreate(
-                ['user_id' => $tenant->id, 'slug' => $propertyData['slug']],
-                array_merge($propertyData, ['user_id' => $tenant->id])
+                ['tenant_id' => $tenant->id, 'slug' => $propertyData['slug']],
+                array_merge($propertyData, [
+                    'tenant_id' => $tenant->id,
+                    'created_by' => $demoUser->id,
+                    'updated_by' => $demoUser->id,
+                ])
             );
         }
 
@@ -161,8 +187,12 @@ class DemoDataSeeder extends Seeder
 
         foreach ($testimonials as $testimonialData) {
             Testimonial::updateOrCreate(
-                ['user_id' => $tenant->id, 'client_name' => $testimonialData['client_name']],
-                array_merge($testimonialData, ['user_id' => $tenant->id])
+                ['tenant_id' => $tenant->id, 'client_name' => $testimonialData['client_name']],
+                array_merge($testimonialData, [
+                    'tenant_id' => $tenant->id,
+                    'created_by' => $demoUser->id,
+                    'updated_by' => $demoUser->id,
+                ])
             );
         }
     }

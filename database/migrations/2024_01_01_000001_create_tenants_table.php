@@ -11,15 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('subscriptions', function (Blueprint $table) {
+        Schema::create('tenants', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('stripe_subscription_id')->unique();
-            $table->string('stripe_price_id');
-            $table->string('status', 50)->index();
+            $table->string('name');
+            $table->string('stripe_customer_id')->nullable()->index();
+            $table->string('stripe_subscription_id')->nullable()->index();
+            $table->string('subscription_status', 50)->default('incomplete')->index();
             $table->timestamp('trial_ends_at')->nullable();
-            $table->timestamp('ends_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
@@ -28,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('subscriptions');
+        Schema::dropIfExists('tenants');
     }
 };

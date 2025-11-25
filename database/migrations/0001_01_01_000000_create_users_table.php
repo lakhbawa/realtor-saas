@@ -17,12 +17,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('subdomain', 100)->unique();
             $table->boolean('is_admin')->default(false);
-            $table->string('stripe_customer_id')->nullable()->index();
-            $table->string('stripe_subscription_id')->nullable()->index();
-            $table->string('subscription_status', 50)->default('incomplete')->index();
-            $table->timestamp('trial_ends_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
