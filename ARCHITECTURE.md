@@ -703,6 +703,245 @@ If multiple domains per site are needed, migrate to separate `domains` table wit
 
 ---
 
+## Traefik Integration
+
+✅ **Implemented** - Dynamic Traefik configuration management for multi-tenant routing.
+
+### Overview
+
+The application uses **Traefik** as a reverse proxy to handle:
+- **Wildcard subdomain routing** for `*.myrealtorsites.com`
+- **Custom domain routing** for verified tenant custom domains
+- **Automatic HTTPS** with Let's Encrypt certificate generation
+- **HTTP to HTTPS redirection**
+
+### How It Works
+
+1. **Sync Command**: `php artisan traefik:sync`
+   - Queries all sites with active tenant subscriptions
+   - Collects verified custom domains
+   - Generates Traefik dynamic YAML configuration
+   - Writes config to file (auto-reloaded by Traefik)
+
+2. **Dynamic Configuration**: `/traefik/dynamic/realtor-saas.yml`
+   - Contains routing rules for all domains
+   - Updated whenever custom domains are added/verified/removed
+   - Traefik watches this file and reloads automatically
+
+3. **Domain Resolution Priority**:
+   - Custom domains (exact match): `Host(\`www.johndoe.com\`)`
+   - Subdomains (regex match): `HostRegexp(\`{subdomain:[a-z0-9-]+}.myrealtorsites.com\`)`
+
+### Configuration
+
+**Environment Variables** (`.env`):
+```bash
+APP_BASE_DOMAIN=myrealtorsites.com
+
+# Traefik Configuration
+TRAEFIK_SERVICE_NAME=realtor-saas
+TRAEFIK_BACKEND_URL=http://nginx:80
+TRAEFIK_CONFIG_PATH=/traefik/dynamic/realtor-saas.yml
+```
+
+**Config File** (`config/app.php`):
+```php
+'base_domain' => env('APP_BASE_DOMAIN', 'myrealtorsites.com'),
+'traefik_service_name' => env('TRAEFIK_SERVICE_NAME', 'realtor-saas'),
+'traefik_backend_url' => env('TRAEFIK_BACKEND_URL', 'http://nginx:80'),
+'traefik_config_path' => env('TRAEFIK_CONFIG_PATH', storage_path('app/traefik/realtor-saas.yml')),
+```
+
+### Usage
+
+#### Manual Sync
+
+Run the sync command manually to update Traefik configuration:
+
+```bash
+# Generate and write config
+php artisan traefik:sync
+
+# Preview config without writing (dry-run)
+php artisan traefik:sync --dry-run
+```
+
+#### Automated Sync
+
+**Recommended**: Set up a scheduled task to sync automatically:
+
+**In `app/Console/Kernel.php`:**
+```php
+protected function schedule(Schedule $schedule): void
+{
+    // Sync Traefik config every 15 minutes
+    $schedule->command('traefik:sync')->everyFifteenMinutes();
+}
+```
+
+**Or trigger on domain verification:**
+```php
+// When custom domain is verified
+$site->update(['custom_domain_verified' => true]);
+
+// Immediately sync Traefik config
+Artisan::call('traefik:sync');
+```
+
+### Generated Configuration Example
+
+```yaml
+http:
+  routers:
+    realtor-saas:
+      rule: HostRegexp(`{subdomain:[a-z0-9-]+}.myrealtorsites.com`) || Host(`www.johndoe.com`) || Host(`www.janedoe.com`)
+      service: realtor-saas
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+    realtor-saas-http:
+      rule: HostRegexp(`{subdomain:[a-z0-9-]+}.myrealtorsites.com`) || Host(`www.johndoe.com`) || Host(`www.janedoe.com`)
+      service: realtor-saas
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+  services:
+    realtor-saas:
+      loadBalancer:
+        servers:
+          - url: http://nginx:80
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+```
+
+### Traefik Static Configuration
+
+**Required in `traefik.yml` (static config):**
+
+```yaml
+# Entry points
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+# Certificate resolvers
+certificateResolvers:
+  letsencrypt:
+    acme:
+      email: admin@myrealtorsites.com
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+# Dynamic configuration providers
+providers:
+  file:
+    directory: /traefik/dynamic
+    watch: true
+```
+
+### Docker Volume Mount
+
+**In `docker-compose.yml`:**
+
+```yaml
+services:
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik/traefik.yml:/traefik.yml
+      - ./traefik/dynamic:/traefik/dynamic  # Dynamic config directory
+      - ./letsencrypt:/letsencrypt          # Certificate storage
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  app:
+    volumes:
+      - ./traefik/dynamic:/traefik/dynamic  # Mount same directory for writing
+```
+
+### Workflow: Adding a Custom Domain
+
+1. **Tenant adds custom domain in dashboard**
+   ```php
+   $site->update([
+       'custom_domain' => 'www.johndoe.com',
+       'custom_domain_verified' => false,
+   ]);
+   ```
+
+2. **Tenant configures DNS**
+   ```
+   CNAME: www.johndoe.com → johndoe.myrealtorsites.com
+   ```
+
+3. **System verifies DNS** (manual or automated)
+   ```php
+   $site->update(['custom_domain_verified' => true]);
+   ```
+
+4. **Sync Traefik configuration**
+   ```bash
+   php artisan traefik:sync
+   ```
+   Or automatically via scheduled task or event listener.
+
+5. **Traefik auto-reloads** and requests Let's Encrypt certificate
+
+6. **Custom domain is live** with HTTPS
+
+### Benefits
+
+✅ **Automatic HTTPS** - Let's Encrypt certificates for all domains
+✅ **Zero Downtime** - Traefik reloads config without restart
+✅ **Scalable** - Supports unlimited custom domains
+✅ **Wildcard Subdomains** - Single rule handles all `*.myrealtorsites.com`
+✅ **HTTP → HTTPS Redirect** - Automatic secure redirect
+✅ **Centralized Management** - Single command updates all routing
+
+### Troubleshooting
+
+#### Issue: Custom domain not accessible
+
+**Possible Causes:**
+1. DNS not configured correctly (missing CNAME)
+2. Domain not marked as verified in database
+3. Traefik config not synced after verification
+4. Let's Encrypt rate limits reached
+
+**Solutions:**
+```bash
+# Check DNS propagation
+dig www.johndoe.com
+
+# Verify database status
+php artisan tinker
+>>> Site::where('custom_domain', 'www.johndoe.com')->first()->custom_domain_verified
+
+# Force sync Traefik config
+php artisan traefik:sync
+
+# Check Traefik logs
+docker logs traefik
+```
+
+#### Issue: Wildcard subdomain not working
+
+**Cause:** Traefik static config missing or incorrect
+
+**Solution:** Verify `traefik.yml` has file provider configured and volume is mounted correctly.
+
+---
+
 ## Future Enhancements
 
 1. **Multi-Site Per Tenant** ✅ **Completed**

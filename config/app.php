@@ -123,4 +123,33 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Multi-Tenant Domain Configuration
+    |--------------------------------------------------------------------------
+    |
+    | The base domain is used for subdomain-based tenant routing.
+    | Example: If base_domain = "myrealtorsites.com", then tenants can use
+    | subdomains like johndoe.myrealtorsites.com
+    |
+    */
+
+    'base_domain' => env('APP_BASE_DOMAIN', env('APP_DOMAIN', 'myrealtorsites.com')),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Traefik Reverse Proxy Configuration
+    |--------------------------------------------------------------------------
+    |
+    | These values configure the Traefik dynamic configuration sync command.
+    | The service name identifies this application in Traefik.
+    | The backend URL is where Traefik forwards requests.
+    | The config path is where the dynamic YAML configuration is written.
+    |
+    */
+
+    'traefik_service_name' => env('TRAEFIK_SERVICE_NAME', 'realtor-saas'),
+    'traefik_backend_url' => env('TRAEFIK_BACKEND_URL', 'http://nginx:80'),
+    'traefik_config_path' => env('TRAEFIK_CONFIG_PATH', storage_path('app/traefik/realtor-saas.yml')),
+
 ];
