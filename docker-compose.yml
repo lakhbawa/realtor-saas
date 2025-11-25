@@ -80,18 +80,6 @@ services:
       - "4332:5432"
     networks: [app-network]
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "4350:80"
-    depends_on:
-      - db
-    networks: [app-network]
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
   adminer:
     image: adminer:latest
     ports:
@@ -109,45 +97,7 @@ services:
       - redisdata:/data
     networks:
       - app-network
-  # phpmyadmin
-  phpmyadmin:
-    depends_on:
-      - db
-    image: arm64v8/phpmyadmin
-    restart: always
-    ports:
-      - '4383:80'
-    environment:
-      PMA_HOST: db
-      MYSQL_ROOT_PASSWORD: Sartaj@jaan855
-      UPLOAD_LIMIT: 100M
-    networks:
-      - app-network
-  wp-db:
-    image: mysql:latest
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: mockready_wordpress
-      MYSQL_USER: wp_user
-      MYSQL_PASSWORD: "mock@wp58310$"
-      MYSQL_ROOT_PASSWORD: "mock@wp58310$"
-    volumes:
-      - wp-dbdata:/var/lib/mysql
-    networks:
-      - app-network
-  wp-phpmyadmin:
-    depends_on:
-      - wp-db
-    image: arm64v8/phpmyadmin
-    restart: always
-    ports:
-      - '4385:80'
-    environment:
-      PMA_HOST: wp-db
-      MYSQL_ROOT_PASSWORD: "mock@wp58310$"
-      UPLOAD_LIMIT: 100M
-    networks:
-      - app-network
+
 
 #Docker Networks
 networks:
@@ -158,12 +108,6 @@ volumes:
   dbdata:
     driver: local
   redisdata:
-    driver: local
-  wp-content:
-    driver: local
-  wp-dbdata:
-    driver: local
-  pgadmin_data:
     driver: local
 #  default:
 #    external:
