@@ -111,20 +111,21 @@ class TenantMiddleware
      */
     protected function extractSubdomain(string $host, string $baseDomain): ?string
     {
-        // Handle localhost development - check query param first
+        // First try to extract from host (works in all environments)
+        if (str_ends_with($host, '.' . $baseDomain)) {
+            $subdomain = str_replace('.' . $baseDomain, '', $host);
+
+            if (!empty($subdomain) && $subdomain !== 'www') {
+                return strtolower($subdomain);
+            }
+        }
+
+        // Fallback: Handle localhost development via query param
         if ($this->isLocalDevelopment($host)) {
             return request()->query('subdomain');
         }
 
-        // Remove the base domain from the host
-        $subdomain = str_replace('.' . $baseDomain, '', $host);
-
-        // If the subdomain equals the host, no subdomain was found
-        if ($subdomain === $host || $subdomain === 'www') {
-            return null;
-        }
-
-        return strtolower($subdomain);
+        return null;
     }
 
     /**
