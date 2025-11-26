@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Site;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class TenantMiddleware
@@ -18,6 +19,10 @@ class TenantMiddleware
         $host = $request->getHost();
         $baseDomain = config('app.base_domain', 'myrealtorsites.com');
 
+        Log::info('TenantMiddleware', [
+            'host' => $host,
+            'baseDomain' => $baseDomain,
+        ]);
         // Find the site and tenant
         $site = null;
         $tenant = null;
