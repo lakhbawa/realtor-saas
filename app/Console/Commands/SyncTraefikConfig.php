@@ -109,13 +109,6 @@ class SyncTraefikConfig extends Command
         // Build host rules for base domain (wildcard + root)
         $baseRule = 'HostRegexp(`{subdomain:[a-z0-9-]+}.' . $baseDomain . '`) || Host(`' . $baseDomain . '`)';
 
-        // Build host rules for custom domains
-        $customRules = [];
-        foreach ($customDomains as $domain) {
-            $customRules[] = "Host(`{$domain}`)";
-        }
-        $customRule = implode(' || ', $customRules);
-
         // Build config array
         $config = [
             'http' => [
@@ -164,11 +157,14 @@ class SyncTraefikConfig extends Command
             ],
         ];
 
-        // Add custom domains router only if there are custom domains
-        if (!empty($customDomains)) {
-            // Custom domains router - HTTP challenge (no wildcard)
-            $config['http']['routers']["{$serviceName}-custom"] = [
-                'rule' => $customRule,
+        // Add SEPARATE router for EACH custom domain
+        // This ensures one failing domain doesn't block others from getting certificates
+        foreach ($customDomains as $domain) {
+            $safeName = $this->getSafeRouterName($domain);
+
+            // HTTPS router for this domain
+            $config['http']['routers']["{$serviceName}-{$safeName}"] = [
+                'rule' => "Host(`{$domain}`)",
                 'service' => $serviceName,
                 'entryPoints' => ['websecure'],
                 'tls' => [
@@ -176,9 +172,9 @@ class SyncTraefikConfig extends Command
                 ],
             ];
 
-            // Custom domains HTTP redirect
-            $config['http']['routers']["{$serviceName}-custom-http"] = [
-                'rule' => $customRule,
+            // HTTP redirect router for this domain
+            $config['http']['routers']["{$serviceName}-{$safeName}-http"] = [
+                'rule' => "Host(`{$domain}`)",
                 'service' => $serviceName,
                 'entryPoints' => ['web'],
                 'middlewares' => ['redirect-to-https'],
@@ -186,6 +182,15 @@ class SyncTraefikConfig extends Command
         }
 
         return Yaml::dump($config, 10, 2);
+    }
+
+    /**
+     * Convert domain to safe router name.
+     * e.g., "john-smith.realty.com" -> "john-smith-realty-com"
+     */
+    protected function getSafeRouterName(string $domain): string
+    {
+        return preg_replace('/[^a-z0-9-]/', '-', strtolower($domain));
     }
 
     /**
