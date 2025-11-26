@@ -48,13 +48,13 @@ class SyncTraefikConfig extends Command
         $this->info('Found ' . $sites->count() . ' site(s) with active subscriptions.');
 
         // Collect all domains
-        $domains = [];
+        $customDomains = [];
         $customDomainCount = 0;
 
         foreach ($sites as $site) {
             // Add verified custom domains
             if ($site->hasCustomDomain()) {
-                $domains[] = $site->custom_domain;
+                $customDomains[] = $site->custom_domain;
                 $customDomainCount++;
                 $this->line("  ✓ Custom domain: {$site->custom_domain}");
             }
@@ -76,7 +76,7 @@ class SyncTraefikConfig extends Command
         $this->line("  - Total rules: " . ($customDomainCount + 1));
 
         // Generate Traefik dynamic config
-        $config = $this->generateTraefikConfig($wildcardDomain, $domains);
+        $config = $this->generateTraefikConfig($baseDomain, $customDomains);
 
         if ($this->option('dry-run')) {
             $this->newLine();
@@ -106,19 +106,19 @@ class SyncTraefikConfig extends Command
     /**
      * Generate Traefik dynamic configuration YAML.
      */
-    protected function generateTraefikConfig(string $wildcardDomain, array $customDomains): string
+    protected function generateTraefikConfig(string $baseDomain, array $customDomains): string
     {
         $serviceName = config('app.traefik_service_name', 'realtor-saas');
         $backendUrl = config('app.traefik_backend_url', 'http://nginx:80');
 
-        // Build the Host rules
+        // Build the Host rules with correct syntax: Host(`domain`) not Host`domain`)
         $hostRules = [];
 
         // Add wildcard subdomain (matches any subdomain)
-        $hostRules[] = "HostRegexp(`{subdomain:[a-z0-9-]+}.{$this->extractBaseDomain($wildcardDomain)}`)";
+        $hostRules[] = "HostRegexp(`{subdomain:[a-z0-9-]+}.{$baseDomain}`)";
 
         // Add base domain
-        $hostRules[] = "Host(`{$this->extractBaseDomain($wildcardDomain)}`)";
+        $hostRules[] = "Host(`{$baseDomain}`)";
 
         // Add custom domains (exact match)
         foreach ($customDomains as $domain) {
@@ -126,6 +126,19 @@ class SyncTraefikConfig extends Command
         }
 
         $rule = implode(' || ', $hostRules);
+
+        // Build TLS domains for certificate requests
+        $tlsDomains = [
+            [
+                'main' => $baseDomain,
+                'sans' => ["*.{$baseDomain}"],
+            ],
+        ];
+
+        // Add each custom domain as separate certificate
+        foreach ($customDomains as $domain) {
+            $tlsDomains[] = ['main' => $domain];
+        }
 
         $config = [
             'http' => [
@@ -136,6 +149,7 @@ class SyncTraefikConfig extends Command
                         'entryPoints' => ['websecure'],
                         'tls' => [
                             'certResolver' => 'lets-encrypt',
+                            'domains' => $tlsDomains,
                         ],
                     ],
                     "{$serviceName}-http" => [
@@ -167,15 +181,6 @@ class SyncTraefikConfig extends Command
 
         return Yaml::dump($config, 10, 2);
     }
-
-    /**
-     * Extract base domain from wildcard (*.example.com -> example.com).
-     */
-    protected function extractBaseDomain(string $wildcardDomain): string
-    {
-        return str_replace('*.', '', $wildcardDomain);
-    }
-
 
     /**
      * Get the path where Traefik config should be written.
