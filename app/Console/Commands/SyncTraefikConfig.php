@@ -107,7 +107,7 @@ class SyncTraefikConfig extends Command
         $backendUrl = config('app.traefik_backend_url', 'http://nginx:80');
 
         // Build host rules for base domain (wildcard + root)
-        $baseRule = 'HostRegexp(`{subdomain:[a-z0-9-]+}.' . $baseDomain . '`) || Host(`' . $baseDomain . '`)';
+        $baseRule = 'HostRegexp(`{subdomain:[a-z0-9-]+}.' . $baseDomain . '`, `' . $baseDomain . '`)';
 
         // Build config array
         $config = [
