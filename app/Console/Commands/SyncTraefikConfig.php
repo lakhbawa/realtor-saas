@@ -47,15 +47,13 @@ class SyncTraefikConfig extends Command
 
         $this->info('Found ' . $sites->count() . ' site(s) with active subscriptions.');
 
-        // Collect all domains
+        // Collect all custom domains
         $customDomains = [];
-        $customDomainCount = 0;
 
         foreach ($sites as $site) {
             // Add verified custom domains
             if ($site->hasCustomDomain()) {
                 $customDomains[] = $site->custom_domain;
-                $customDomainCount++;
                 $this->line("  ✓ Custom domain: {$site->custom_domain}");
             }
 
@@ -65,15 +63,12 @@ class SyncTraefikConfig extends Command
             }
         }
 
-        // Add wildcard subdomain rule for base domain
-        $wildcardDomain = "*.{$baseDomain}";
-        $this->info("\n  ✓ Wildcard subdomain: {$wildcardDomain}");
+        $this->info("\n  ✓ Wildcard subdomain: *.{$baseDomain}");
 
         $this->newLine();
         $this->info("Summary:");
-        $this->line("  - Wildcard subdomain: 1 ({$wildcardDomain})");
-        $this->line("  - Custom domains: {$customDomainCount}");
-        $this->line("  - Total rules: " . ($customDomainCount + 1));
+        $this->line("  - Wildcard subdomain: 1 (*.{$baseDomain})");
+        $this->line("  - Custom domains: " . count($customDomains));
 
         // Generate Traefik dynamic config
         $config = $this->generateTraefikConfig($baseDomain, $customDomains);
@@ -111,49 +106,38 @@ class SyncTraefikConfig extends Command
         $serviceName = config('app.traefik_service_name', 'realtor-saas');
         $backendUrl = config('app.traefik_backend_url', 'http://nginx:80');
 
-        // Build the Host rules with correct syntax: Host(`domain`) not Host`domain`)
-        $hostRules = [];
+        // Build host rules for base domain (wildcard + root)
+        $baseRule = "HostRegexp(`{subdomain:[a-z0-9-]+}.{$baseDomain}`) || Host(`{$baseDomain}`)";
 
-        // Add wildcard subdomain (matches any subdomain)
-        $hostRules[] = "HostRegexp(`{subdomain:[a-z0-9-]+}.{$baseDomain}`)";
-
-        // Add base domain
-        $hostRules[] = "Host(`{$baseDomain}`)";
-
-        // Add custom domains (exact match)
+        // Build host rules for custom domains
+        $customRules = [];
         foreach ($customDomains as $domain) {
-            $hostRules[] = "Host(`{$domain}`)";
+            $customRules[] = "Host(`{$domain}`)";
         }
+        $customRule = implode(' || ', $customRules);
 
-        $rule = implode(' || ', $hostRules);
-
-        // Build TLS domains for certificate requests
-        $tlsDomains = [
-            [
-                'main' => $baseDomain,
-                'sans' => ["*.{$baseDomain}"],
-            ],
-        ];
-
-        // Add each custom domain as separate certificate
-        foreach ($customDomains as $domain) {
-            $tlsDomains[] = ['main' => $domain];
-        }
-
+        // Build config array
         $config = [
             'http' => [
                 'routers' => [
+                    // Base domain router - DNS challenge (supports wildcard)
                     $serviceName => [
-                        'rule' => $rule,
+                        'rule' => $baseRule,
                         'service' => $serviceName,
                         'entryPoints' => ['websecure'],
                         'tls' => [
                             'certResolver' => 'lets-encrypt',
-                            'domains' => $tlsDomains,
+                            'domains' => [
+                                [
+                                    'main' => $baseDomain,
+                                    'sans' => ["*.{$baseDomain}"],
+                                ],
+                            ],
                         ],
                     ],
+                    // Base domain HTTP redirect
                     "{$serviceName}-http" => [
-                        'rule' => $rule,
+                        'rule' => $baseRule,
                         'service' => $serviceName,
                         'entryPoints' => ['web'],
                         'middlewares' => ['redirect-to-https'],
@@ -178,6 +162,27 @@ class SyncTraefikConfig extends Command
                 ],
             ],
         ];
+
+        // Add custom domains router only if there are custom domains
+        if (!empty($customDomains)) {
+            // Custom domains router - HTTP challenge (no wildcard)
+            $config['http']['routers']["{$serviceName}-custom"] = [
+                'rule' => $customRule,
+                'service' => $serviceName,
+                'entryPoints' => ['websecure'],
+                'tls' => [
+                    'certResolver' => 'lets-encrypt-http',
+                ],
+            ];
+
+            // Custom domains HTTP redirect
+            $config['http']['routers']["{$serviceName}-custom-http"] = [
+                'rule' => $customRule,
+                'service' => $serviceName,
+                'entryPoints' => ['web'],
+                'middlewares' => ['redirect-to-https'],
+            ];
+        }
 
         return Yaml::dump($config, 10, 2);
     }
