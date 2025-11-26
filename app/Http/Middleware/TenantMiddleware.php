@@ -34,24 +34,37 @@ class TenantMiddleware
             ->first();
 
         // If not found by custom domain, try subdomain
+        Log::info('Custom domain check', ['found' => $site ? true : false]);
+
+        // If not found by custom domain, try subdomain
         if (!$site) {
             $subdomain = $this->extractSubdomain($host, $baseDomain);
+
+            Log::info('Subdomain extraction', ['subdomain' => $subdomain]);
 
             if ($subdomain) {
                 // Skip reserved subdomains
                 $reserved = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'dashboard'];
                 if (in_array($subdomain, $reserved)) {
+                    Log::info('Reserved subdomain, skipping');
                     return $next($request);
                 }
 
-                // Find the site by subdomain and eager load tenant
+                // Find the site by subdomain
                 $site = Site::where('subdomain', $subdomain)
                     ->with('tenant')
                     ->first();
 
+                Log::info('Site lookup by subdomain', [
+                    'subdomain' => $subdomain,
+                    'found' => $site ? true : false,
+                    'site_id' => $site?->id,
+                ]);
+
                 if (!$site) {
                     abort(404, 'Site not found');
                 }
+
             } elseif ($this->isLocalDevelopment($host)) {
                 // For development/testing: use first site with tenant that has valid subscription
                 $site = Site::whereHas('tenant', function ($query) {
