@@ -23,16 +23,6 @@ services:
       - realtor-network
     #Nginx Service
 
-  realtor-stripe-cli:
-    image: stripe/stripe-cli:latest
-    restart: unless-stopped
-    command: "listen --forward-to http://realtor-nginx:80/stripe/webhook --log-level debug"
-    environment:
-      STRIPE_API_KEY: ${STRIPE_SECRET}
-    networks:
-      - realtor-network
-    depends_on:
-      - realtor-nginx
   realtor-job:
     depends_on:
       - realtor-db
