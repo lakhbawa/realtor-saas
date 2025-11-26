@@ -104,7 +104,7 @@ class SyncTraefikConfig extends Command
     protected function generateTraefikConfig(string $baseDomain, array $customDomains): string
     {
         $serviceName = config('app.traefik_service_name', 'realtor-saas');
-        $backendUrl = config('app.traefik_backend_url', 'http://nginx:80');
+        $backendUrl = config('app.traefik_backend_url', 'http://realtor-nginx:80');
 
         // Build host rules for base domain (wildcard + root)
         $baseRule = 'HostRegexp(`{subdomain:[a-z0-9-]+}.' . $baseDomain . '`, `' . $baseDomain . '`)';
