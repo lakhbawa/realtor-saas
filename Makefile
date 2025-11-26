@@ -7,12 +7,12 @@ dkupprod:
 dkrebootprod:
 		docker compose -f docker-compose-production.yml up down && docker compose -f docker-compose-production.yml up -d
 shell:
-		docker compose exec app bash
+		docker compose exec realtor-app bash
 shellprod:
-		docker compose -f docker-compose-production.yml exec app bash
+		docker compose -f docker-compose-production.yml exec realtor-app bash
 shellstag:
-		docker compose -f docker-compose-staging.yml exec app bash
+		docker compose -f docker-compose-staging.yml exec realtor-app bash
 nginx:
 		docker compose exec nginx /bin/sh
 test:
-		docker compose exec app sh -c 'php artisan test'
+		docker compose exec realtor-app sh -c 'php artisan test'
