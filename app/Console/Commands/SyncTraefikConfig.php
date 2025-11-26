@@ -146,6 +146,7 @@ class SyncTraefikConfig extends Command
                 'services' => [
                     $serviceName => [
                         'loadBalancer' => [
+                            'passHostHeader' => true,
                             'servers' => [
                                 ['url' => $backendUrl],
                             ],
