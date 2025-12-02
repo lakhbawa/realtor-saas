@@ -17,12 +17,15 @@ class TenantMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         $host = $request->getHost();
-        $baseDomain = config('app.base_domain', 'myrealtorsites.com');
+
+        // Get all configured base domains
+        $baseDomains = $this->getBaseDomains();
 
         Log::info('TenantMiddleware', [
             'host' => $host,
-            'baseDomain' => $baseDomain,
+            'baseDomains' => $baseDomains,
         ]);
+
         // Find the site and tenant
         $site = null;
         $tenant = null;
@@ -33,12 +36,11 @@ class TenantMiddleware
             ->with('tenant')
             ->first();
 
-        // If not found by custom domain, try subdomain
         Log::info('Custom domain check', ['found' => $site ? true : false]);
 
-        // If not found by custom domain, try subdomain
+        // If not found by custom domain, try subdomain extraction from any base domain
         if (!$site) {
-            $subdomain = $this->extractSubdomain($host, $baseDomain);
+            $subdomain = $this->extractSubdomain($host, $baseDomains);
 
             Log::info('Subdomain extraction', ['subdomain' => $subdomain]);
 
@@ -107,16 +109,29 @@ class TenantMiddleware
     }
 
     /**
-     * Extract subdomain from the host.
+     * Get all configured base domains.
      */
-    protected function extractSubdomain(string $host, string $baseDomain): ?string
+    protected function getBaseDomains(): array
     {
-        // First try to extract from host (works in all environments)
-        if (str_ends_with($host, '.' . $baseDomain)) {
-            $subdomain = str_replace('.' . $baseDomain, '', $host);
+        return array_merge(
+            [config('app.base_domain', 'myrealtorsites.com')],
+            config('settings.additional_base_domains', [])
+        );
+    }
 
-            if (!empty($subdomain) && $subdomain !== 'www') {
-                return strtolower($subdomain);
+    /**
+     * Extract subdomain from the host by checking against all base domains.
+     */
+    protected function extractSubdomain(string $host, array $baseDomains): ?string
+    {
+        // Try to extract subdomain from any configured base domain
+        foreach ($baseDomains as $baseDomain) {
+            if (str_ends_with($host, '.' . $baseDomain)) {
+                $subdomain = str_replace('.' . $baseDomain, '', $host);
+
+                if (!empty($subdomain) && $subdomain !== 'www') {
+                    return strtolower($subdomain);
+                }
             }
         }
 
