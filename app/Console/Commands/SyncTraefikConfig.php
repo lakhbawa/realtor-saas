@@ -30,8 +30,11 @@ class SyncTraefikConfig extends Command
     {
         $this->info('Syncing site domains to Traefik...');
 
-        // Get base domain for wildcard subdomain support
-        $baseDomainDefault = config('app.base_domain', 'myrealtorsites.com');
+        // Get all base domains
+        $baseDomains = array_merge(
+            [config('app.base_domain', 'myrealtorsites.com')],
+            config('settings.additional_base_domains', [])
+        );
 
         // Get all sites with valid tenant subscriptions
         $sites = Site::with('tenant')
@@ -63,85 +66,60 @@ class SyncTraefikConfig extends Command
             }
         }
 
-        $this->info("\n  ✓ Wildcard subdomain: *.{$baseDomainDefault}");
+        // Display wildcard subdomains
+        $this->newLine();
+        foreach ($baseDomains as $baseDomain) {
+            $this->info("  ✓ Wildcard subdomain: *.{$baseDomain}");
+        }
 
         $this->newLine();
         $this->info("Summary:");
-        $this->line("  - Wildcard subdomain: 1 (*.{$baseDomainDefault})");
+        $this->line("  - Base domains with wildcards: " . count($baseDomains));
+        foreach ($baseDomains as $baseDomain) {
+            $this->line("    • *.{$baseDomain}");
+        }
         $this->line("  - Custom domains: " . count($customDomains));
 
-        $baseDomains = [$baseDomainDefault];
-        $baseDomains = array_merge($baseDomains, config('settings.additional_base_domains'));
+        // Generate Traefik dynamic config for ALL domains
+        $config = $this->generateTraefikConfig($baseDomains, $customDomains);
 
-        foreach ($baseDomains as $baseDomain) {
-            // Generate Traefik dynamic config
-            $config = $this->generateTraefikConfig($baseDomain, $customDomains);
-
-            if ($this->option('dry-run')) {
-                $this->newLine();
-                $this->info('Generated config (dry-run):');
-                $this->line($config);
-                return Command::SUCCESS;
-            }
-
-            // Write config to file
-            $configPath = $this->getConfigPath();
-            $configDir = dirname($configPath);
-
-            if (!File::isDirectory($configDir)) {
-                File::makeDirectory($configDir, 0755, true);
-                $this->info("Created directory: {$configDir}");
-            }
-
-            File::put($configPath, $config);
-
+        if ($this->option('dry-run')) {
             $this->newLine();
-            $this->info("✓ Config written to: {$configPath}");
-            $this->info('✓ Traefik will automatically reload the configuration.');
-
+            $this->info('Generated config (dry-run):');
+            $this->line($config);
+            return Command::SUCCESS;
         }
+
+        // Write config to file
+        $configPath = $this->getConfigPath();
+        $configDir = dirname($configPath);
+
+        if (!File::isDirectory($configDir)) {
+            File::makeDirectory($configDir, 0755, true);
+            $this->info("Created directory: {$configDir}");
+        }
+
+        File::put($configPath, $config);
+
+        $this->newLine();
+        $this->info("✓ Config written to: {$configPath}");
+        $this->info('✓ Traefik will automatically reload the configuration.');
 
         return Command::SUCCESS;
     }
 
     /**
-     * Generate Traefik dynamic configuration YAML.
+     * Generate Traefik dynamic configuration YAML for all domains.
      */
-    protected function generateTraefikConfig(string $baseDomain, array $customDomains): string
+    protected function generateTraefikConfig(array $baseDomains, array $customDomains): string
     {
         $serviceName = config('app.traefik_service_name', 'realtor-saas');
         $backendUrl = config('app.traefik_backend_url', 'http://realtor-nginx:80');
 
-        // Build host rules for base domain (wildcard + root)
-        $baseRule = 'HostRegexp(`{subdomain:[a-z0-9-]+}.' . $baseDomain . '`, `' . $baseDomain . '`)';
-
-        // Build config array
+        // Initialize config structure
         $config = [
             'http' => [
-                'routers' => [
-                    // Base domain router - DNS challenge (supports wildcard)
-                    $serviceName => [
-                        'rule' => $baseRule,
-                        'service' => $serviceName,
-                        'entryPoints' => ['websecure'],
-                        'tls' => [
-                            'certResolver' => 'lets-encrypt',
-                            'domains' => [
-                                [
-                                    'main' => $baseDomain,
-                                    'sans' => ["*.{$baseDomain}"],
-                                ],
-                            ],
-                        ],
-                    ],
-                    // Base domain HTTP redirect
-                    "{$serviceName}-http" => [
-                        'rule' => $baseRule,
-                        'service' => $serviceName,
-                        'entryPoints' => ['web'],
-                        'middlewares' => ['redirect-to-https'],
-                    ],
-                ],
+                'routers' => [],
                 'services' => [
                     $serviceName => [
                         'loadBalancer' => [
@@ -162,6 +140,36 @@ class SyncTraefikConfig extends Command
                 ],
             ],
         ];
+
+        // Add routers for each base domain (wildcard + root)
+        foreach ($baseDomains as $baseDomain) {
+            $safeName = $this->getSafeRouterName($baseDomain);
+            $baseRule = 'HostRegexp(`{subdomain:[a-z0-9-]+}.' . $baseDomain . '`, `' . $baseDomain . '`)';
+
+            // HTTPS router - DNS challenge (supports wildcard)
+            $config['http']['routers']["{$serviceName}-{$safeName}"] = [
+                'rule' => $baseRule,
+                'service' => $serviceName,
+                'entryPoints' => ['websecure'],
+                'tls' => [
+                    'certResolver' => 'lets-encrypt',
+                    'domains' => [
+                        [
+                            'main' => $baseDomain,
+                            'sans' => ["*.{$baseDomain}"],
+                        ],
+                    ],
+                ],
+            ];
+
+            // HTTP redirect router
+            $config['http']['routers']["{$serviceName}-{$safeName}-http"] = [
+                'rule' => $baseRule,
+                'service' => $serviceName,
+                'entryPoints' => ['web'],
+                'middlewares' => ['redirect-to-https'],
+            ];
+        }
 
         // Add SEPARATE router for EACH custom domain
         // This ensures one failing domain doesn't block others from getting certificates
