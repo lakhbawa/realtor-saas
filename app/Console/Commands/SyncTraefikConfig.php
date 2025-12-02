@@ -31,7 +31,7 @@ class SyncTraefikConfig extends Command
         $this->info('Syncing site domains to Traefik...');
 
         // Get base domain for wildcard subdomain support
-        $baseDomain = config('app.base_domain', 'myrealtorsites.com');
+        $baseDomainDefault = config('app.base_domain', 'myrealtorsites.com');
 
         // Get all sites with valid tenant subscriptions
         $sites = Site::with('tenant')
@@ -63,37 +63,43 @@ class SyncTraefikConfig extends Command
             }
         }
 
-        $this->info("\n  ✓ Wildcard subdomain: *.{$baseDomain}");
+        $this->info("\n  ✓ Wildcard subdomain: *.{$baseDomainDefault}");
 
         $this->newLine();
         $this->info("Summary:");
-        $this->line("  - Wildcard subdomain: 1 (*.{$baseDomain})");
+        $this->line("  - Wildcard subdomain: 1 (*.{$baseDomainDefault})");
         $this->line("  - Custom domains: " . count($customDomains));
 
-        // Generate Traefik dynamic config
-        $config = $this->generateTraefikConfig($baseDomain, $customDomains);
+        $baseDomains = [$baseDomainDefault];
+        $baseDomains = array_merge($baseDomains, config('settings.additional_base_domains'));
 
-        if ($this->option('dry-run')) {
+        foreach ($baseDomains as $baseDomain) {
+            // Generate Traefik dynamic config
+            $config = $this->generateTraefikConfig($baseDomain, $customDomains);
+
+            if ($this->option('dry-run')) {
+                $this->newLine();
+                $this->info('Generated config (dry-run):');
+                $this->line($config);
+                return Command::SUCCESS;
+            }
+
+            // Write config to file
+            $configPath = $this->getConfigPath();
+            $configDir = dirname($configPath);
+
+            if (!File::isDirectory($configDir)) {
+                File::makeDirectory($configDir, 0755, true);
+                $this->info("Created directory: {$configDir}");
+            }
+
+            File::put($configPath, $config);
+
             $this->newLine();
-            $this->info('Generated config (dry-run):');
-            $this->line($config);
-            return Command::SUCCESS;
+            $this->info("✓ Config written to: {$configPath}");
+            $this->info('✓ Traefik will automatically reload the configuration.');
+
         }
-
-        // Write config to file
-        $configPath = $this->getConfigPath();
-        $configDir = dirname($configPath);
-
-        if (!File::isDirectory($configDir)) {
-            File::makeDirectory($configDir, 0755, true);
-            $this->info("Created directory: {$configDir}");
-        }
-
-        File::put($configPath, $config);
-
-        $this->newLine();
-        $this->info("✓ Config written to: {$configPath}");
-        $this->info('✓ Traefik will automatically reload the configuration.');
 
         return Command::SUCCESS;
     }

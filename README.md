@@ -1,3 +1,6 @@
+This software is licensed under the CC BY-NC 4.0 license.
+Commercial use is strictly prohibited.
+
 # Realtor SaaS Platform
 
 A multi-tenant SaaS platform for real estate professionals to create and manage their own branded websites. Built with Laravel 11, Filament v3, and Stripe for subscription billing.
