@@ -38,7 +38,6 @@ class RegisteredUserController extends Controller
                 'regex:/^[a-z0-9-]+$/',
                 'unique:'.User::class,
                 function ($attribute, $value, $fail) {
-                    // Reserved subdomains
                     $reserved = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'localhost', 'dashboard'];
                     if (in_array(strtolower($value), $reserved)) {
                         $fail('This subdomain is reserved and cannot be used.');
@@ -61,8 +60,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        // TODO: Redirect to Stripe Checkout
-        // For now, redirect to dashboard with notice
         return redirect(route('dashboard', absolute: false))
             ->with('status', 'Registration complete! Please set up billing to activate your account.');
     }

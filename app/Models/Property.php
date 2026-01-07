@@ -66,7 +66,6 @@ class Property extends Model
     {
         parent::boot();
 
-        // Auto-scope to current tenant context
         static::addGlobalScope('tenant', function (Builder $builder) {
             if (auth()->check() && !auth()->user()->is_admin) {
                 $currentTenant = auth()->user()->currentTenant();
@@ -76,7 +75,6 @@ class Property extends Model
             }
         });
 
-        // Auto-set tenant_id and created_by on create
         static::creating(function ($property) {
             if (!$property->tenant_id && auth()->check()) {
                 $currentTenant = auth()->user()->currentTenant();
@@ -89,13 +87,11 @@ class Property extends Model
                 $property->created_by = auth()->id();
             }
 
-            // Auto-generate slug if not provided
             if (empty($property->slug)) {
                 $property->slug = Str::slug($property->title);
             }
         });
 
-        // Auto-set updated_by on update
         static::updating(function ($property) {
             if (auth()->check()) {
                 $property->updated_by = auth()->id();

@@ -15,7 +15,6 @@ class DemoDataSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create admin user
         $admin = User::updateOrCreate(
             ['email' => 'admin@example.com'],
             [
@@ -25,7 +24,6 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        // Create demo user
         $demoUser = User::updateOrCreate(
             ['email' => 'demo@example.com'],
             [
@@ -35,7 +33,6 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        // Create demo tenant
         $tenant = Tenant::updateOrCreate(
             ['name' => 'John Smith Realty'],
             [
@@ -44,15 +41,12 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        // Attach demo user to tenant as owner
         $tenant->users()->syncWithoutDetaching([
             $demoUser->id => ['role' => 'owner']
         ]);
 
-        // Get a template
         $template = Template::where('slug', 'modern')->first();
 
-        // Create site for demo tenant
         $site = Site::updateOrCreate(
             ['tenant_id' => $tenant->id, 'subdomain' => 'johnsmith'],
             [
@@ -87,7 +81,6 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        // Create demo properties
         $properties = [
             [
                 'title' => 'Modern Beverly Hills Estate',
@@ -166,7 +159,6 @@ class DemoDataSeeder extends Seeder
             );
         }
 
-        // Create demo testimonials
         $testimonials = [
             [
                 'client_name' => 'Sarah & Michael Johnson',

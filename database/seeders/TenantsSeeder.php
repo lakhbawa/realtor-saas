@@ -18,7 +18,6 @@ class TenantsSeeder extends Seeder
     {
         $this->command->info('Creating tenants with custom domains for testing...');
 
-        // Get or create a template
         $template = Template::firstOrCreate(
             ['slug' => 'modern'],
             [
@@ -29,7 +28,6 @@ class TenantsSeeder extends Seeder
             ]
         );
 
-        // Create test tenants with various scenarios
         $tenants = [
             [
                 'name' => 'Premium Realty Group',
@@ -208,7 +206,6 @@ class TenantsSeeder extends Seeder
         foreach ($tenants as $tenantData) {
             $this->command->info("Creating tenant: {$tenantData['name']}");
 
-            // Create or update user
             $user = User::updateOrCreate(
                 ['email' => $tenantData['user']['email']],
                 [
@@ -218,7 +215,6 @@ class TenantsSeeder extends Seeder
                 ]
             );
 
-            // Create or update tenant
             $tenant = Tenant::updateOrCreate(
                 ['name' => $tenantData['name']],
                 [
@@ -227,12 +223,10 @@ class TenantsSeeder extends Seeder
                 ]
             );
 
-            // Attach user to tenant
             $tenant->users()->syncWithoutDetaching([
                 $user->id => ['role' => 'owner']
             ]);
 
-            // Create sites for this tenant
             foreach ($tenantData['sites'] as $siteData) {
                 $site = Site::updateOrCreate(
                     [

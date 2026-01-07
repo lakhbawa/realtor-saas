@@ -89,7 +89,6 @@ class StripeWebhookController extends Controller
                 : null,
         ]);
 
-        // Create subscription record
         Subscription::updateOrCreate(
             ['user_id' => $user->id],
             [
@@ -176,7 +175,6 @@ class StripeWebhookController extends Controller
             return response()->json(['error' => 'User not found'], 404);
         }
 
-        // Update subscription status to active if it was past_due
         if ($user->subscription_status === 'past_due') {
             $user->update(['subscription_status' => 'active']);
 
@@ -212,8 +210,6 @@ class StripeWebhookController extends Controller
             'invoice_id' => $invoice->id,
         ]);
 
-        // TODO: Send email notification to user about failed payment
-
         return response()->json(['message' => 'Payment failure recorded']);
     }
 
@@ -229,8 +225,6 @@ class StripeWebhookController extends Controller
             'user_id' => $user->id,
             'trial_ends_at' => $subscription->trial_end,
         ]);
-
-        // TODO: Send email notification to user about trial ending
 
         return response()->json(['message' => 'Trial ending notification processed']);
     }

@@ -18,7 +18,6 @@ class PublicSiteController extends Controller
 {
     public function __construct()
     {
-        // Tenant and site are resolved by middleware
     }
 
     protected function getTenant(): Tenant
@@ -57,7 +56,6 @@ class PublicSiteController extends Controller
         $site = $this->getSite();
         $template = $this->getTemplateName();
 
-        // Get published pages for navigation
         $navPages = Page::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
@@ -119,7 +117,6 @@ class PublicSiteController extends Controller
             ->where('tenant_id', $tenant->id)
             ->where('status', 'active');
 
-        // Filters
         if ($request->filled('min_price')) {
             $query->where('price', '>=', $request->min_price);
         }
@@ -168,7 +165,6 @@ class PublicSiteController extends Controller
             ->where('status', 'active')
             ->firstOrFail();
 
-        // Get related properties by similar price range or location
         $relatedProperties = Property::withoutGlobalScopes()
             ->with('images')
             ->where('tenant_id', $tenant->id)
@@ -211,7 +207,6 @@ class PublicSiteController extends Controller
     {
         $tenant = $this->getTenant();
 
-        // Get featured testimonials first
         $featuredTestimonials = Testimonial::withoutGlobalScopes()
             ->with('property')
             ->where('tenant_id', $tenant->id)
@@ -220,7 +215,6 @@ class PublicSiteController extends Controller
             ->ordered()
             ->get();
 
-        // Get all other testimonials
         $testimonials = Testimonial::withoutGlobalScopes()
             ->with('property')
             ->where('tenant_id', $tenant->id)
@@ -229,7 +223,6 @@ class PublicSiteController extends Controller
             ->ordered()
             ->paginate(12);
 
-        // Calculate stats
         $totalTestimonials = Testimonial::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->where('is_published', true)
@@ -275,14 +268,12 @@ class PublicSiteController extends Controller
             'message' => $validated['message'],
         ]);
 
-        // Send email notification
         $notifyEmail = $site->email ?? config('mail.from.address');
         Mail::to($notifyEmail)->queue(new ContactFormSubmitted($submission));
 
         return back()->with('success', 'Thank you for your message! We will get back to you soon.');
     }
 
-    // Blog methods
     public function blog(Request $request)
     {
         $tenant = $this->getTenant();
@@ -337,7 +328,6 @@ class PublicSiteController extends Controller
         ]);
     }
 
-    // Custom pages
     public function page(string $slug)
     {
         $tenant = $this->getTenant();

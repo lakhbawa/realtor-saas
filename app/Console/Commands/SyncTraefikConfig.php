@@ -30,13 +30,11 @@ class SyncTraefikConfig extends Command
     {
         $this->info('Syncing site domains to Traefik...');
 
-        // Get all base domains
         $baseDomains = array_merge(
             [config('app.base_domain', 'myrealtorsites.com')],
             config('settings.additional_base_domains', [])
         );
 
-        // Get all sites with valid tenant subscriptions
         $sites = Site::with('tenant')
             ->whereHas('tenant', function ($query) {
                 $query->whereIn('subscription_status', ['active', 'trialing']);
@@ -50,23 +48,19 @@ class SyncTraefikConfig extends Command
 
         $this->info('Found ' . $sites->count() . ' site(s) with active subscriptions.');
 
-        // Collect all custom domains
         $customDomains = [];
 
         foreach ($sites as $site) {
-            // Add verified custom domains
             if ($site->hasCustomDomain()) {
                 $customDomains[] = $site->custom_domain;
                 $this->line("  ✓ Custom domain: {$site->custom_domain}");
             }
 
-            // Log pending verifications
             if ($site->customDomainPendingVerification()) {
                 $this->comment("  ⏳ Pending verification: {$site->custom_domain} (skipped)");
             }
         }
 
-        // Display wildcard subdomains
         $this->newLine();
         foreach ($baseDomains as $baseDomain) {
             $this->info("  ✓ Wildcard subdomain: *.{$baseDomain}");
@@ -80,7 +74,6 @@ class SyncTraefikConfig extends Command
         }
         $this->line("  - Custom domains: " . count($customDomains));
 
-        // Generate Traefik dynamic config for ALL domains
         $config = $this->generateTraefikConfig($baseDomains, $customDomains);
 
         if ($this->option('dry-run')) {
@@ -90,7 +83,6 @@ class SyncTraefikConfig extends Command
             return Command::SUCCESS;
         }
 
-        // Write config to file
         $configPath = $this->getConfigPath();
         $configDir = dirname($configPath);
 
@@ -116,7 +108,6 @@ class SyncTraefikConfig extends Command
         $serviceName = config('app.traefik_service_name', 'realtor-saas');
         $backendUrl = config('app.traefik_backend_url', 'http://realtor-nginx:80');
 
-        // Initialize config structure
         $config = [
             'http' => [
                 'routers' => [],
@@ -141,12 +132,10 @@ class SyncTraefikConfig extends Command
             ],
         ];
 
-        // Add routers for each base domain (wildcard + root)
         foreach ($baseDomains as $baseDomain) {
             $safeName = $this->getSafeRouterName($baseDomain);
             $baseRule = 'HostRegexp(`{subdomain:[a-z0-9-]+}.' . $baseDomain . '`, `' . $baseDomain . '`)';
 
-            // HTTPS router - DNS challenge (supports wildcard)
             $config['http']['routers']["{$serviceName}-{$safeName}"] = [
                 'rule' => $baseRule,
                 'service' => $serviceName,
@@ -162,7 +151,6 @@ class SyncTraefikConfig extends Command
                 ],
             ];
 
-            // HTTP redirect router
             $config['http']['routers']["{$serviceName}-{$safeName}-http"] = [
                 'rule' => $baseRule,
                 'service' => $serviceName,
@@ -171,12 +159,9 @@ class SyncTraefikConfig extends Command
             ];
         }
 
-        // Add SEPARATE router for EACH custom domain
-        // This ensures one failing domain doesn't block others from getting certificates
         foreach ($customDomains as $domain) {
             $safeName = $this->getSafeRouterName($domain);
 
-            // HTTPS router for this domain
             $config['http']['routers']["{$serviceName}-{$safeName}"] = [
                 'rule' => "Host(`{$domain}`)",
                 'service' => $serviceName,
@@ -186,7 +171,6 @@ class SyncTraefikConfig extends Command
                 ],
             ];
 
-            // HTTP redirect router for this domain
             $config['http']['routers']["{$serviceName}-{$safeName}-http"] = [
                 'rule' => "Host(`{$domain}`)",
                 'service' => $serviceName,

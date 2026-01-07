@@ -99,7 +99,6 @@ class Billing extends Page
         try {
             $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
 
-            // Create or retrieve customer
             if (!$user->stripe_customer_id) {
                 $customer = $stripe->customers->create([
                     'email' => $user->email,
