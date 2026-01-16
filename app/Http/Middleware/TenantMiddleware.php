@@ -10,97 +10,117 @@ use Symfony\Component\HttpFoundation\Response;
 
 class TenantMiddleware
 {
-    /**
-     * Handle an incoming request.
-     * Resolves the site and tenant from the subdomain and makes them available.
-     */
+    private const RESERVED_SUBDOMAINS = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'dashboard'];
+
     public function handle(Request $request, Closure $next): Response
     {
         $host = $request->getHost();
+        $baseDomains = $this->baseDomains();
 
-        $baseDomains = $this->getBaseDomains();
+        Log::info('TenantMiddleware', compact('host', 'baseDomains'));
 
-        Log::info('TenantMiddleware', [
-            'host' => $host,
-            'baseDomains' => $baseDomains,
-        ]);
+        $site = $this->resolveSite($host, $baseDomains);
 
-        $site = null;
-        $tenant = null;
-
-        $site = Site::where('custom_domain', $host)
-            ->where('custom_domain_verified', true)
-            ->with('tenant')
-            ->first();
-
-        Log::info('Custom domain check', ['found' => $site ? true : false]);
-
-        if (!$site) {
-            $subdomain = $this->extractSubdomain($host, $baseDomains);
-
-            Log::info('Subdomain extraction', ['subdomain' => $subdomain]);
-
-            if ($subdomain) {
-                $reserved = ['www', 'admin', 'api', 'app', 'mail', 'ftp', 'dashboard'];
-                if (in_array($subdomain, $reserved)) {
-                    Log::info('Reserved subdomain, skipping');
-                    return $next($request);
-                }
-
-                $site = Site::where('subdomain', $subdomain)
-                    ->with('tenant')
-                    ->first();
-
-                Log::info('Site lookup by subdomain', [
-                    'subdomain' => $subdomain,
-                    'found' => $site ? true : false,
-                    'site_id' => $site?->id,
-                ]);
-
-                if (!$site) {
-                    abort(404, 'Site not found');
-                }
-
-            } elseif ($this->isLocalDevelopment($host)) {
-                $site = Site::whereHas('tenant', function ($query) {
-                    $query->whereIn('subscription_status', ['active', 'trialing']);
-                })->with('tenant')->first();
-            }
-        }
-
-        if ($site) {
-            $tenant = $site->tenant;
-        }
-
-        if (!$site || !$tenant) {
+        if (!$site || !$site->tenant) {
             return $next($request);
         }
 
-        if (!$tenant->hasValidSubscription()) {
-            abort(403, 'This site is currently unavailable. Please check your subscription.');
+        if (!$site->tenant->hasValidSubscription()) {
+            abort(403, 'This site is currently unavailable');
         }
 
-        app()->instance('site', $site);
-        app()->instance('tenant', $tenant);
-        app()->instance('currentTenant', $tenant);
-        app()->instance('currentSite', $site);
-        view()->share('site', $site);
-        view()->share('tenant', $tenant);
-
-        $request->attributes->set('site', $site);
-        $request->attributes->set('tenant', $tenant);
+        $this->bindToContainer($site);
+        $this->setRequestAttributes($request, $site);
 
         if (auth()->check()) {
-            auth()->user()->setCurrentTenant($tenant);
+            auth()->user()->setCurrentTenant($site->tenant);
         }
 
         return $next($request);
     }
 
-    /**
-     * Get all configured base domains.
-     */
-    protected function getBaseDomains(): array
+    private function resolveSite(string $host, array $baseDomains): ?Site
+    {
+        if ($site = $this->findByCustomDomain($host)) {
+            return $site;
+        }
+
+        if ($subdomain = $this->extractSubdomain($host, $baseDomains)) {
+            return $this->isReserved($subdomain)
+                ? null
+                : $this->findBySubdomain($subdomain);
+        }
+
+        return $this->isLocalEnvironment($host)
+            ? $this->findActiveSite()
+            : null;
+    }
+
+    private function findByCustomDomain(string $host): ?Site
+    {
+        return Site::where('custom_domain', $host)
+            ->where('custom_domain_verified', true)
+            ->with('tenant')
+            ->first();
+    }
+
+    private function findBySubdomain(string $subdomain): ?Site
+    {
+        $site = Site::where('subdomain', $subdomain)
+            ->with('tenant')
+            ->first();
+
+        Log::info('Site lookup by subdomain', [
+            'subdomain' => $subdomain,
+            'found' => (bool) $site,
+            'site_id' => $site?->id,
+        ]);
+
+        return $site ?? abort(404, 'Site not found');
+    }
+
+    private function findActiveSite(): ?Site
+    {
+        return Site::whereHas('tenant', fn($q) =>
+            $q->whereIn('subscription_status', ['active', 'trialing'])
+        )->with('tenant')->first();
+    }
+
+    private function extractSubdomain(string $host, array $baseDomains): ?string
+    {
+        foreach ($baseDomains as $baseDomain) {
+            if (str_ends_with($host, '.'.$baseDomain)) {
+                $subdomain = str_replace('.'.$baseDomain, '', $host);
+
+                if ($subdomain && $subdomain !== 'www') {
+                    return strtolower($subdomain);
+                }
+            }
+        }
+
+        return $this->isLocalEnvironment($host)
+            ? request()->query('subdomain')
+            : null;
+    }
+
+    private function bindToContainer(Site $site): void
+    {
+        app()->instance('site', $site);
+        app()->instance('tenant', $site->tenant);
+        app()->instance('currentTenant', $site->tenant);
+        app()->instance('currentSite', $site);
+
+        view()->share('site', $site);
+        view()->share('tenant', $site->tenant);
+    }
+
+    private function setRequestAttributes(Request $request, Site $site): void
+    {
+        $request->attributes->set('site', $site);
+        $request->attributes->set('tenant', $site->tenant);
+    }
+
+    private function baseDomains(): array
     {
         return array_merge(
             [config('app.base_domain', 'myrealtorsites.com')],
@@ -108,32 +128,12 @@ class TenantMiddleware
         );
     }
 
-    /**
-     * Extract subdomain from the host by checking against all base domains.
-     */
-    protected function extractSubdomain(string $host, array $baseDomains): ?string
+    private function isReserved(string $subdomain): bool
     {
-        foreach ($baseDomains as $baseDomain) {
-            if (str_ends_with($host, '.' . $baseDomain)) {
-                $subdomain = str_replace('.' . $baseDomain, '', $host);
-
-                if (!empty($subdomain) && $subdomain !== 'www') {
-                    return strtolower($subdomain);
-                }
-            }
-        }
-
-        if ($this->isLocalDevelopment($host)) {
-            return request()->query('subdomain');
-        }
-
-        return null;
+        return in_array($subdomain, self::RESERVED_SUBDOMAINS);
     }
 
-    /**
-     * Check if running in local development.
-     */
-    protected function isLocalDevelopment(string $host): bool
+    private function isLocalEnvironment(string $host): bool
     {
         return str_contains($host, 'localhost')
             || str_contains($host, '127.0.0.1')

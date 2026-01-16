@@ -2,242 +2,71 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Tenant;
-use App\Models\Site;
-use App\Models\Property;
-use App\Models\Testimonial;
+use App\Http\Requests\ContactSubmissionRequest;
+use App\Mail\ContactFormSubmitted;
+use App\Models\BlogPost;
 use App\Models\ContactSubmission;
 use App\Models\Page;
-use App\Models\BlogPost;
-use App\Mail\ContactFormSubmitted;
+use App\Models\Property;
+use App\Models\Testimonial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\View\View;
 
-class PublicSiteController extends Controller
+class PublicSiteController extends TenantController
 {
-    public function __construct()
-    {
-    }
-
-    protected function getTenant(): Tenant
-    {
-        $tenant = app()->bound('tenant') ? app('tenant') : null;
-
-        if (!$tenant) {
-            abort(404, 'Site not found. Please access via subdomain.');
-        }
-
-        return $tenant;
-    }
-
-    protected function getSite(): Site
-    {
-        $site = app()->bound('site') ? app('site') : null;
-
-        if (!$site) {
-            abort(404, 'Site not found.');
-        }
-
-        return $site;
-    }
-
-    protected function getTemplateName(): string
-    {
-        $site = $this->getSite();
-        $template = $site?->template;
-
-        return $template?->slug ?? 'modern';
-    }
-
-    protected function view(string $view, array $data = []): View
-    {
-        $tenant = $this->getTenant();
-        $site = $this->getSite();
-        $template = $this->getTemplateName();
-
-        $navPages = Page::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->orderBy('sort_order')
-            ->get();
-
-        $baseData = [
-            'tenant' => $tenant,
-            'site' => $site,
-            'template' => $template,
-            'navPages' => $navPages,
-        ];
-
-        return view("templates.{$template}.{$view}", array_merge($baseData, $data));
-    }
-
     public function home()
     {
-        $tenant = $this->getTenant();
-
-        $featuredProperties = Property::withoutGlobalScopes()
-            ->with('images')
-            ->where('tenant_id', $tenant->id)
-            ->where('status', 'active')
-            ->where('is_featured', true)
-            ->latest()
-            ->take(6)
-            ->get();
-
-        $testimonials = Testimonial::withoutGlobalScopes()
-            ->with('property')
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->ordered()
-            ->take(3)
-            ->get();
-
-        $recentPosts = BlogPost::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
-            ->latest('published_at')
-            ->take(3)
-            ->get();
-
         return $this->view('home', [
-            'featuredProperties' => $featuredProperties,
-            'testimonials' => $testimonials,
-            'recentPosts' => $recentPosts,
+            'featuredProperties' => $this->featuredProperties(),
+            'testimonials' => $this->topTestimonials(3),
+            'recentPosts' => $this->recentBlogPosts(3),
         ]);
     }
 
     public function properties(Request $request)
     {
-        $tenant = $this->getTenant();
+        $properties = Property::withoutGlobalScopes()
+            ->with('images')
+            ->where('tenant_id', $this->tenant()->id)
+            ->where('status', 'active')
+            ->when($request->filled('min_price'), fn($q) => $q->where('price', '>=', $request->min_price))
+            ->when($request->filled('max_price'), fn($q) => $q->where('price', '<=', $request->max_price))
+            ->when($request->filled('bedrooms'), fn($q) => $q->where('bedrooms', '>=', $request->bedrooms))
+            ->when($request->filled('bathrooms'), fn($q) => $q->where('bathrooms', '>=', $request->bathrooms))
+            ->when($request->filled('city'), fn($q) => $q->where('city', 'ilike', '%'.$request->city.'%'))
+            ->when($request->filled('search'), fn($q) => $this->applySearch($q, $request->search))
+            ->latest()
+            ->paginate(12);
 
-        $query = Property::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('status', 'active');
-
-        if ($request->filled('min_price')) {
-            $query->where('price', '>=', $request->min_price);
-        }
-
-        if ($request->filled('max_price')) {
-            $query->where('price', '<=', $request->max_price);
-        }
-
-        if ($request->filled('bedrooms')) {
-            $query->where('bedrooms', '>=', $request->bedrooms);
-        }
-
-        if ($request->filled('bathrooms')) {
-            $query->where('bathrooms', '>=', $request->bathrooms);
-        }
-
-        if ($request->filled('city')) {
-            $query->where('city', 'ilike', '%' . $request->city . '%');
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'ilike', "%{$search}%")
-                    ->orWhere('address', 'ilike', "%{$search}%")
-                    ->orWhere('city', 'ilike', "%{$search}%")
-                    ->orWhere('description', 'ilike', "%{$search}%");
-            });
-        }
-
-        $properties = $query->with('images')->latest()->paginate(12);
-
-        return $this->view('properties', [
-            'properties' => $properties,
-        ]);
+        return $this->view('properties', compact('properties'));
     }
 
     public function property(string $slug)
     {
-        $tenant = $this->getTenant();
-
-        $property = Property::withoutGlobalScopes()
-            ->with('images')
-            ->where('tenant_id', $tenant->id)
-            ->where('slug', $slug)
-            ->where('status', 'active')
-            ->firstOrFail();
-
-        $relatedProperties = Property::withoutGlobalScopes()
-            ->with('images')
-            ->where('tenant_id', $tenant->id)
-            ->where('id', '!=', $property->id)
-            ->where('status', 'active')
-            ->where(function ($query) use ($property) {
-                $query->where('city', $property->city)
-                    ->orWhereBetween('price', [
-                        $property->price * 0.7,
-                        $property->price * 1.3
-                    ]);
-            })
-            ->take(3)
-            ->get();
+        $property = $this->findProperty($slug);
 
         return $this->view('property', [
             'property' => $property,
-            'relatedProperties' => $relatedProperties,
+            'relatedProperties' => $this->relatedProperties($property),
         ]);
     }
 
     public function about()
     {
-        $tenant = $this->getTenant();
-
-        $testimonials = Testimonial::withoutGlobalScopes()
-            ->with('property')
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->ordered()
-            ->take(6)
-            ->get();
-
         return $this->view('about', [
-            'testimonials' => $testimonials,
+            'testimonials' => $this->topTestimonials(6),
         ]);
     }
 
     public function testimonials()
     {
-        $tenant = $this->getTenant();
-
-        $featuredTestimonials = Testimonial::withoutGlobalScopes()
-            ->with('property')
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->where('is_featured', true)
-            ->ordered()
-            ->get();
-
-        $testimonials = Testimonial::withoutGlobalScopes()
-            ->with('property')
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->where('is_featured', false)
-            ->ordered()
-            ->paginate(12);
-
-        $totalTestimonials = Testimonial::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->count();
-
-        $averageRating = Testimonial::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->avg('rating');
+        $query = $this->testimonialsQuery();
 
         return $this->view('testimonials', [
-            'featuredTestimonials' => $featuredTestimonials,
-            'testimonials' => $testimonials,
-            'totalTestimonials' => $totalTestimonials,
-            'averageRating' => round($averageRating, 1),
+            'featuredTestimonials' => (clone $query)->where('is_featured', true)->get(),
+            'testimonials' => (clone $query)->where('is_featured', false)->paginate(12),
+            'totalTestimonials' => (clone $query)->count(),
+            'averageRating' => round((clone $query)->avg('rating'), 1),
         ]);
     }
 
@@ -246,100 +75,153 @@ class PublicSiteController extends Controller
         return $this->view('contact');
     }
 
-    public function submitContact(Request $request)
+    public function submitContact(ContactSubmissionRequest $request)
     {
-        $tenant = $this->getTenant();
-        $site = $this->getSite();
+        $submission = ContactSubmission::create(array_merge(
+            $request->validated(),
+            ['tenant_id' => $this->tenant()->id]
+        ));
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
-            'phone' => 'nullable|string|max:20',
-            'message' => 'required|string|max:5000',
-            'property_id' => 'nullable|exists:properties,id',
-        ]);
-
-        $submission = ContactSubmission::create([
-            'tenant_id' => $tenant->id,
-            'property_id' => $validated['property_id'] ?? null,
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
-            'message' => $validated['message'],
-        ]);
-
-        $notifyEmail = $site->email ?? config('mail.from.address');
-        Mail::to($notifyEmail)->queue(new ContactFormSubmitted($submission));
+        Mail::to($this->site()->email ?? config('mail.from.address'))
+            ->queue(new ContactFormSubmitted($submission));
 
         return back()->with('success', 'Thank you for your message! We will get back to you soon.');
     }
 
     public function blog(Request $request)
     {
-        $tenant = $this->getTenant();
+        $posts = $this->publishedBlogPostsQuery()
+            ->when($request->filled('search'), fn($q) => $this->applyBlogSearch($q, $request->search))
+            ->latest('published_at')
+            ->paginate(9);
 
-        $query = BlogPost::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('is_published', true)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now());
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'ilike', "%{$search}%")
-                    ->orWhere('excerpt', 'ilike', "%{$search}%")
-                    ->orWhere('content', 'ilike', "%{$search}%");
-            });
-        }
-
-        $posts = $query->latest('published_at')->paginate(9);
-
-        return $this->view('blog', [
-            'posts' => $posts,
-        ]);
+        return $this->view('blog', compact('posts'));
     }
 
     public function blogPost(string $slug)
     {
-        $tenant = $this->getTenant();
-
-        $post = BlogPost::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
+        $post = $this->publishedBlogPostsQuery()
             ->where('slug', $slug)
-            ->where('is_published', true)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
             ->firstOrFail();
-
-        $recentPosts = BlogPost::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('id', '!=', $post->id)
-            ->where('is_published', true)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
-            ->latest('published_at')
-            ->take(3)
-            ->get();
 
         return $this->view('blog-post', [
             'post' => $post,
-            'recentPosts' => $recentPosts,
+            'recentPosts' => $this->recentBlogPosts(3, $post->id),
         ]);
     }
 
     public function page(string $slug)
     {
-        $tenant = $this->getTenant();
-
         $page = Page::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
+            ->where('tenant_id', $this->tenant()->id)
             ->where('slug', $slug)
             ->where('is_published', true)
             ->firstOrFail();
 
-        return $this->view('page', [
-            'page' => $page,
-        ]);
+        return $this->view('page', compact('page'));
+    }
+
+    protected function view(string $view, array $data = [])
+    {
+        return parent::view($view, array_merge($data, [
+            'navPages' => $this->navigationPages(),
+        ]));
+    }
+
+    private function featuredProperties()
+    {
+        return Property::withoutGlobalScopes()
+            ->with('images')
+            ->where('tenant_id', $this->tenant()->id)
+            ->where('status', 'active')
+            ->where('is_featured', true)
+            ->latest()
+            ->limit(6)
+            ->get();
+    }
+
+    private function findProperty(string $slug)
+    {
+        return Property::withoutGlobalScopes()
+            ->with('images')
+            ->where('tenant_id', $this->tenant()->id)
+            ->where('slug', $slug)
+            ->where('status', 'active')
+            ->firstOrFail();
+    }
+
+    private function relatedProperties(Property $property)
+    {
+        return Property::withoutGlobalScopes()
+            ->with('images')
+            ->where('tenant_id', $this->tenant()->id)
+            ->where('id', '!=', $property->id)
+            ->where('status', 'active')
+            ->where(fn($q) => $q->where('city', $property->city)
+                ->orWhereBetween('price', [$property->price * 0.7, $property->price * 1.3]))
+            ->limit(3)
+            ->get();
+    }
+
+    private function topTestimonials(int $limit)
+    {
+        return $this->testimonialsQuery()
+            ->limit($limit)
+            ->get();
+    }
+
+    private function testimonialsQuery()
+    {
+        return Testimonial::withoutGlobalScopes()
+            ->with('property')
+            ->where('tenant_id', $this->tenant()->id)
+            ->where('is_published', true)
+            ->ordered();
+    }
+
+    private function publishedBlogPostsQuery()
+    {
+        return BlogPost::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant()->id)
+            ->where('is_published', true)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now());
+    }
+
+    private function recentBlogPosts(int $limit, ?int $excludeId = null)
+    {
+        return $this->publishedBlogPostsQuery()
+            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
+            ->latest('published_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    private function navigationPages()
+    {
+        return Page::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant()->id)
+            ->where('is_published', true)
+            ->orderBy('sort_order')
+            ->get();
+    }
+
+    private function applySearch($query, string $search)
+    {
+        return $query->where(fn($q) =>
+            $q->where('title', 'ilike', "%{$search}%")
+                ->orWhere('address', 'ilike', "%{$search}%")
+                ->orWhere('city', 'ilike', "%{$search}%")
+                ->orWhere('description', 'ilike', "%{$search}%")
+        );
+    }
+
+    private function applyBlogSearch($query, string $search)
+    {
+        return $query->where(fn($q) =>
+            $q->where('title', 'ilike', "%{$search}%")
+                ->orWhere('excerpt', 'ilike', "%{$search}%")
+                ->orWhere('content', 'ilike', "%{$search}%")
+        );
     }
 }

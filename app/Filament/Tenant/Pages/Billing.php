@@ -2,20 +2,22 @@
 
 namespace App\Filament\Tenant\Pages;
 
-use Filament\Pages\Page;
+use App\Services\BillingService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Http;
+use Filament\Pages\Page;
 
 class Billing extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-credit-card';
-
     protected static string $view = 'filament.tenant.pages.billing';
-
     protected static ?string $navigationGroup = 'Settings';
-
     protected static ?int $navigationSort = 2;
+
+    public function __construct(private BillingService $billing)
+    {
+        parent::__construct();
+    }
 
     public function getSubscriptionStatus(): string
     {
@@ -35,8 +37,7 @@ class Billing extends Page
 
     public function getTrialEndsAt(): ?string
     {
-        $trialEnds = auth()->user()->trial_ends_at;
-        return $trialEnds ? $trialEnds->format('F j, Y') : null;
+        return auth()->user()->trial_ends_at?->format('F j, Y');
     }
 
     public function hasActiveSubscription(): bool
@@ -51,14 +52,14 @@ class Billing extends Page
                 ->label('Manage Billing')
                 ->icon('heroicon-o-cog-6-tooth')
                 ->action('redirectToCustomerPortal')
-                ->visible(fn () => auth()->user()->stripe_customer_id !== null),
+                ->visible(fn() => auth()->user()->stripe_customer_id !== null),
 
             Action::make('subscribe')
                 ->label('Subscribe Now')
                 ->icon('heroicon-o-credit-card')
                 ->color('success')
                 ->action('redirectToCheckout')
-                ->visible(fn () => !$this->hasActiveSubscription()),
+                ->visible(fn() => !$this->hasActiveSubscription()),
         ];
     }
 
@@ -67,22 +68,13 @@ class Billing extends Page
         $user = auth()->user();
 
         if (!$user->stripe_customer_id) {
-            Notification::make()
-                ->title('No billing account found')
-                ->danger()
-                ->send();
+            Notification::make()->title('No billing account found')->danger()->send();
             return;
         }
 
         try {
-            $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
-
-            $session = $stripe->billingPortal->sessions->create([
-                'customer' => $user->stripe_customer_id,
-                'return_url' => route('filament.tenant.pages.billing'),
-            ]);
-
-            $this->redirect($session->url);
+            $url = $this->billing->createPortalSession($user, route('filament.tenant.pages.billing'));
+            $this->redirect($url);
         } catch (\Exception $e) {
             Notification::make()
                 ->title('Unable to access billing portal')
@@ -94,42 +86,14 @@ class Billing extends Page
 
     public function redirectToCheckout(): void
     {
-        $user = auth()->user();
-
         try {
-            $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+            $url = $this->billing->createCheckoutSession(
+                auth()->user(),
+                route('filament.tenant.pages.billing').'?success=true',
+                route('filament.tenant.pages.billing').'?canceled=true'
+            );
 
-            if (!$user->stripe_customer_id) {
-                $customer = $stripe->customers->create([
-                    'email' => $user->email,
-                    'name' => $user->name,
-                    'metadata' => [
-                        'user_id' => $user->id,
-                        'subdomain' => $user->subdomain,
-                    ],
-                ]);
-                $user->update(['stripe_customer_id' => $customer->id]);
-            }
-
-            $session = $stripe->checkout->sessions->create([
-                'customer' => $user->stripe_customer_id,
-                'payment_method_types' => ['card'],
-                'line_items' => [[
-                    'price' => config('services.stripe.price_id'),
-                    'quantity' => 1,
-                ]],
-                'mode' => 'subscription',
-                'success_url' => route('filament.tenant.pages.billing') . '?success=true',
-                'cancel_url' => route('filament.tenant.pages.billing') . '?canceled=true',
-                'subscription_data' => [
-                    'trial_period_days' => 14,
-                    'metadata' => [
-                        'user_id' => $user->id,
-                    ],
-                ],
-            ]);
-
-            $this->redirect($session->url);
+            $this->redirect($url);
         } catch (\Exception $e) {
             Notification::make()
                 ->title('Unable to start checkout')
@@ -144,21 +108,12 @@ class Billing extends Page
         $user = auth()->user();
 
         if (!$user->stripe_subscription_id) {
-            Notification::make()
-                ->title('No active subscription found')
-                ->danger()
-                ->send();
+            Notification::make()->title('No active subscription found')->danger()->send();
             return;
         }
 
         try {
-            $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
-
-            $stripe->subscriptions->update($user->stripe_subscription_id, [
-                'cancel_at_period_end' => true,
-            ]);
-
-            $user->update(['subscription_status' => 'canceled']);
+            $this->billing->cancelSubscription($user);
 
             Notification::make()
                 ->title('Subscription canceled')
